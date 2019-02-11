@@ -6,18 +6,30 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xmlns:xsl="http://www.w3.org/1999/XSL/Transform" 
 xmlns:d="http://cern.ch/quasar/Design"
 xmlns:fnc="http://cern.ch/quasar/MyFunctions"
-xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform schema-for-xslt20.xsd ">
+xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for-xslt20.xsd ">
 	<xsl:include href="../../Design/CommonFunctions.xslt" />
 	<xsl:output method="text"></xsl:output>
-	 <xsl:param name="className"/>
-	 <xsl:param name="xsltFileName"/>
-	 <xsl:param name="namespace"/>
-
 	
 
+    <xsl:template name="classToDpt">
+    <xsl:param name="className"/>
+    //<xsl:value-of select="$className"/>
+    bool createDpt<xsl:value-of select="@name"/>()
+    {
+    
+    }
+    </xsl:template>
 	
 	<xsl:template match="/">	
-
+    // generated using Cacophony, an optional module of quasar
+    // generated at: TODO
+    
+    <xsl:for-each select="/d:design/d:class">
+    <xsl:call-template name="classToDpt">
+        <xsl:with-param name="className"><xsl:value-of select="@name"/></xsl:with-param>
+    </xsl:call-template>   
+    </xsl:for-each>
+    
     </xsl:template>
 
 
