@@ -9,6 +9,7 @@ xmlns:fnc="http://cern.ch/quasar/MyFunctions"
 xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for-xslt20.xsd ">
 	<xsl:include href="../../Design/CommonFunctions.xslt" />
 	<xsl:output method="text"></xsl:output>
+    <xsl:param name="typePrefix"/>
 	
     <xsl:function name="fnc:quasarDataTypeToDptTypeConstant">
     <xsl:param name="dataType"/>
@@ -36,7 +37,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     // the names of vars and the way of generating DPT come directly from examples of dpTypeCreate
     dyn_dyn_string xxdepes;
     dyn_dyn_int xxdepei;
-    dynAppend(xxdepes, makeDynString("<xsl:value-of select='$className'/>", ""));
+    dynAppend(xxdepes, makeDynString("<xsl:value-of select="$typePrefix"/><xsl:value-of select='$className'/>", ""));
     dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
     <xsl:for-each select="d:cachevariable">
     dynAppend(xxdepes, makeDynString("", "<xsl:value-of select='@name'/>"));
@@ -62,8 +63,10 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     int main ()
     {
         <xsl:for-each select="/d:design/d:class">
-            createDpt<xsl:value-of select="@name"/>();
+            if (!createDpt<xsl:value-of select="@name"/>())
+            return 1;
         </xsl:for-each>
+        return 0;
     }
     
     </xsl:template>
