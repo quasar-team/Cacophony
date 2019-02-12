@@ -20,6 +20,13 @@ def main():
 		requiresMerge=False, 
 		astyleRun=True, 
 		additionalParam=['typePrefix={0}'.format(args.dpt_prefix)])
+	
+	transformDesign(
+		xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToDeviceDefinition.xslt'), 
+		outputFile=os.path.join(thisModuleName, 'generated', 'createDeviceDefinitions.ctl'), 
+		requiresMerge=False, 
+		astyleRun=True, 
+		additionalParam=['typePrefix={0}'.format(args.dpt_prefix)])	
 
     
 if __name__=="__main__":
