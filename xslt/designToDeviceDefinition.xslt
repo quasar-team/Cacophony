@@ -10,7 +10,8 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 	<xsl:include href="../../Design/CommonFunctions.xslt" />
 	<xsl:output method="text"></xsl:output>
     <xsl:param name="typePrefix"/>
-	
+    <xsl:param name="serverName"/>
+	<xsl:param name="driverNumber"/>
      
     <xsl:template name="classToDeviceDefinition">
     <xsl:param name="className"/>
@@ -21,13 +22,30 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         int rv;
         rv = dpCreate("<xsl:value-of select="$dpt"/>Info", "_FwDeviceDefinition");
         if (rv != 0)
+        {
+          throwError(getLastError());
           return false;
+        }
         dpSet("<xsl:value-of select="$dpt"/>Info.dpType", "<xsl:value-of select="$dpt"/>");
         dpSet("<xsl:value-of select="$dpt"/>Info.version", 1);
         dpSet("<xsl:value-of select="$dpt"/>Info.configuration.address.canHave", true);
         dpSet("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.general.canHave", true);
-            
-    
+        dpSet("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.general.serverName", "<xsl:value-of select="$serverName"/>");
+        dpSet("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.general.driverNumber", <xsl:value-of select="$driverNumber"/>);
+        <xsl:for-each select="d:cachevariable">
+        // for cachevar <xsl:value-of select="@name"/>
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.items", "ns=2;s=xxx.<xsl:value-of select="@name"/>");
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.subscriptions", "OPCUA_SUBSCRIPTION");
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.kinds", 1);
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.variants", 1);
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.types", 750);
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.direction", 2);
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.variants", 1);
+        appendToDpe("<xsl:value-of select="$dpt"/>Info.configuration.address.OPCUA.variants", "EMPTY");
+        
+        </xsl:for-each>    
+
+        return true;    
     }
     </xsl:template>
 	
@@ -36,6 +54,13 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     // generated using Cacophony, an optional module of quasar
     // generated at: TODO
     
+    void appendToDpe(string dpe, string value)
+    {
+        dyn_string dsSomething;
+        dpGet(dpe, dsSomething);
+        dynAppend(dsSomething, value);
+        dpSet(dpe, dsSomething);
+    }
     
     <xsl:for-each select="/d:design/d:class">
     <xsl:call-template name="classToDeviceDefinition">
