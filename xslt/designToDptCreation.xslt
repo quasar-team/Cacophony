@@ -40,10 +40,28 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     dynAppend(xxdepes, makeDynString("<xsl:value-of select="$typePrefix"/><xsl:value-of select='$className'/>", ""));
     dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
     <xsl:for-each select="d:cachevariable">
-    dynAppend(xxdepes, makeDynString("", "<xsl:value-of select='@name'/>"));
-    dynAppend(xxdepei, makeDynInt(0, 
-    <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>));
+        <xsl:choose>
+            <xsl:when test="d:array">
+                <xsl:message>WARNING Class <xsl:value-of select="$className"/> cachevariable <xsl:value-of select="@name"/> is an array.
+                Arrays are not yet supported by Cacophony. Please request from Piotr.
+                </xsl:message>
+            </xsl:when>
+            <xsl:otherwise>
+                dynAppend(xxdepes, makeDynString("", "<xsl:value-of select='@name'/>"));
+                dynAppend(xxdepei, makeDynInt(0, 
+                <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>));
+            </xsl:otherwise>
+        </xsl:choose>
+
+
     </xsl:for-each>
+    <xsl:if test="d:sourcevariable">
+        <xsl:message>WARNING Class <xsl:value-of select="$className"/> has source-variable(s) but they are not yet supported by Cacophony!</xsl:message>
+    </xsl:if>
+
+    <xsl:if test="d:method">
+        <xsl:message>WARNING Class <xsl:value-of select="$className"/> has method(s) but there is no method support in WinCC OA, skipping!</xsl:message>
+    </xsl:if>
     
     int status = dpTypeCreate(xxdepes, xxdepei);
     return status == 0;
