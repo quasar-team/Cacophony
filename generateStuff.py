@@ -35,6 +35,12 @@ def main():
 		astyleRun=True, 
 		additionalParam=additionalParams)	
 
+	transformDesign(
+		xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToConfigParser.xslt'), 
+		outputFile=os.path.join(thisModuleName, 'generated', 'configParser.ctl'), 
+		requiresMerge=False, 
+		astyleRun=True, 
+		additionalParam=additionalParams)	
     
 if __name__=="__main__":
     main()
