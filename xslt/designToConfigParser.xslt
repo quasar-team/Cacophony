@@ -32,9 +32,23 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     
     
     <xsl:for-each select="/d:design/d:class">
-    void configure<xsl:value-of select="@name"/> (int docNum, int childNode)
+    void configure<xsl:value-of select="@name"/> (int docNum, int childNode, string prefix)
     {
         DebugTN("Configure.<xsl:value-of select="@name"/> called");
+        string name;
+        xmlGetElementAttribute(docNum, childNode, "name", name);
+        string fullName = prefix+name;
+        string dpt = "MyQuasarServer"+"<xsl:value-of select="@name"/>";
+        DebugTN("Will create DP "+fullName);
+        int result = dpCreate(fullName, dpt);
+        
+        dyn_int children;
+        <xsl:for-each select="d:hasobjects[@instantiateUsing='configuration']">
+        children = getChildNodesWithName(docNum, childNode, "<xsl:value-of select='@class'/>");
+        for (int i=1; i&lt;=dynlen(children); i++)
+        configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/");
+        </xsl:for-each>
+        
     }
     <!-- 
         <xsl:call-template name="hasObjects">
@@ -90,7 +104,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         dyn_int children = getChildNodesWithName(docNum, firstNode, "<xsl:value-of select='@class'/>");
         for (int i = 1; i&lt;=dynlen(children); i++)
         {
-            configure<xsl:value-of select="@class"/> (docNum, children[i]);
+            configure<xsl:value-of select="@class"/> (docNum, children[i], "");
         }
        
         </xsl:for-each>
