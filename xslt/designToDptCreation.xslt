@@ -21,6 +21,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         <xsl:when test="$dataType='OpcUa_Float'">DPEL_FLOAT</xsl:when>
         <xsl:when test="$dataType='OpcUa_Double'">DPEL_FLOAT</xsl:when>
         <xsl:when test="$dataType='UaString'">DPEL_STRING</xsl:when>
+        <xsl:when test="$dataType='UaByteString'">DPEL_BLOB</xsl:when>
         <xsl:otherwise>
             <xsl:message terminate="yes">The following quasar datatype is not yet supported: 
                 <xsl:value-of select="$dataType"/>
@@ -52,12 +53,23 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
                 <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>));
             </xsl:otherwise>
         </xsl:choose>
-
-
     </xsl:for-each>
-    <xsl:if test="d:sourcevariable">
-        <xsl:message>WARNING Class <xsl:value-of select="$className"/> has source-variable(s) but they are not yet supported by Cacophony!</xsl:message>
-    </xsl:if>
+    
+     <xsl:for-each select="d:sourcevariable">
+        <xsl:choose>
+            <xsl:when test="d:array">
+                <xsl:message>WARNING Class <xsl:value-of select="$className"/> sourcevariable <xsl:value-of select="@name"/> is an array.
+                Arrays are not yet supported by Cacophony. Please request from Piotr.
+                </xsl:message>
+            </xsl:when>
+            <xsl:otherwise>
+                dynAppend(xxdepes, makeDynString("", "<xsl:value-of select='@name'/>"));
+                dynAppend(xxdepei, makeDynInt(0, 
+                <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>));
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:for-each>   
+   
 
     <xsl:if test="d:method">
         <xsl:message>WARNING Class <xsl:value-of select="$className"/> has method(s) but there is no method support in WinCC OA, skipping!</xsl:message>
