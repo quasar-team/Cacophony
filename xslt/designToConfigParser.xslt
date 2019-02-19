@@ -10,6 +10,9 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 	<xsl:include href="../../Design/CommonFunctions.xslt" />
 	<xsl:output method="text"></xsl:output>
     <xsl:param name="typePrefix"/>
+    <xsl:param name="serverName"/>
+    <xsl:param name="driverNumber"/>
+    <xsl:param name="subscriptionName"/>
 	
     <!--  
     <xsl:template name="hasObjects">
@@ -41,6 +44,27 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         string dpt = "MyQuasarServer"+"<xsl:value-of select="@name"/>";
         DebugTN("Will create DP "+fullName);
         int result = dpCreate(fullName, dpt);
+        
+        string dpe, address;
+        dyn_string dsExceptionInfo;
+        <xsl:for-each select="d:cachevariable">
+        dpe = fullName+".<xsl:value-of select='@name'/>";
+        address = dpe; // address can be generated from dpe after some mods ...
+        strreplace(address, "/", ".");
+        fwPeriphAddress_setOPCUA (
+            dpe /*dpe*/,
+            "<xsl:value-of select='$serverName'/>" /* server name*/,
+            <xsl:value-of select="$driverNumber"/>,
+            "ns=2;s="+address,
+            "<xsl:value-of select='$subscriptionName'/>" /* subscription*/,
+            1 /* kind */,
+            1 /* variant */,
+            750 /* datatype */,
+            DPATTR_ADDR_MODE_INPUT_SPONT /* mode */,
+            "" /*poll group */,
+            dsExceptionInfo
+            );
+        </xsl:for-each>
         
         dyn_int children;
         <xsl:for-each select="d:hasobjects[@instantiateUsing='configuration']">
