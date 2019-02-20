@@ -23,6 +23,17 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     </xsl:choose>
     </xsl:function>
    
+    <xsl:function name="fnc:sourceVariableToMode">
+    <xsl:param name="addressSpaceRead"/>
+    <xsl:param name="addressSpaceWrite"/>
+    <xsl:choose>
+    <xsl:when test="$addressSpaceRead!='forbidden' and $addressSpaceWrite!='forbidden'">DPATTR_ADDR_MODE_IO_SQUERY</xsl:when>
+    <xsl:when test="$addressSpaceRead!='forbidden' and $addressSpaceWrite='forbidden'">DPATTR_ADDR_MODE_INPUT_SQUERY</xsl:when>
+    <xsl:when test="$addressSpaceRead='forbidden' and $addressSpaceWrite!='forbidden'">DPATTR_ADDR_MODE_OUTPUT_SINGLE</xsl:when>
+    <xsl:otherwise><xsl:message terminate="yes">Don't know how to map this address because it support neither read nor write...</xsl:message></xsl:otherwise>
+    </xsl:choose>
+    </xsl:function>
+   
 	<xsl:template match="/">	
     // generated using Cacophony, an optional module of quasar
     // generated at: TODO
@@ -30,49 +41,79 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     
     
     <xsl:for-each select="/d:design/d:class">
-    void configure<xsl:value-of select="@name"/> (int docNum, int childNode, string prefix)
+    void configure<xsl:value-of select="@name"/> (
+        int docNum, 
+        int childNode, 
+        string prefix,
+        bool createDps, 
+        bool assignAddresses, 
+        bool continueOnError)
     {
         DebugTN("Configure.<xsl:value-of select="@name"/> called");
         string name;
         xmlGetElementAttribute(docNum, childNode, "name", name);
         string fullName = prefix+name;
         string dpt = "MyQuasarServer"+"<xsl:value-of select="@name"/>";
-        DebugTN("Will create DP "+fullName);
-        int result = dpCreate(fullName, dpt);
         
+        if (createDps)
+        {
+            DebugTN("Will create DP "+fullName);
+            int result = dpCreate(fullName, dpt);
+            // TODO: error handling
+        }
+        
+        if (assignAddresses)
+        {
         string dpe, address;
         dyn_string dsExceptionInfo;
         <xsl:for-each select="d:cachevariable">
-        dpe = fullName+".<xsl:value-of select='@name'/>";
-        address = dpe; // address can be generated from dpe after some mods ...
-        strreplace(address, "/", ".");
-        fwPeriphAddress_setOPCUA (
-            dpe /*dpe*/,
-            "<xsl:value-of select='$serverName'/>" /* server name*/,
-            <xsl:value-of select="$driverNumber"/>,
-            "ns=2;s="+address,
-            "<xsl:value-of select='$subscriptionName'/>" /* subscription*/,
-            1 /* kind */,
-            1 /* variant */,
-            750 /* datatype */,
-            <xsl:value-of select="fnc:cacheVariableToMode(@addressSpaceWrite)"/> /* mode */,
-            "" /*poll group */,
-            dsExceptionInfo
-            );
+            dpe = fullName+".<xsl:value-of select='@name'/>";
+            address = dpe; // address can be generated from dpe after some mods ...
+            strreplace(address, "/", ".");
+            fwPeriphAddress_setOPCUA (
+                dpe /*dpe*/,
+                "<xsl:value-of select='$serverName'/>" /* server name*/,
+                <xsl:value-of select="$driverNumber"/>,
+                "ns=2;s="+address,
+                "<xsl:value-of select='$subscriptionName'/>" /* subscription*/,
+                1 /* kind */,
+                1 /* variant */,
+                750 /* datatype */,
+                <xsl:value-of select="fnc:cacheVariableToMode(@addressSpaceWrite)"/> /* mode */,
+                "" /*poll group */,
+                dsExceptionInfo
+                );
         </xsl:for-each>
+        
+         <xsl:for-each select="d:sourcevariable">
+            dpe = fullName+".<xsl:value-of select='@name'/>";
+            address = dpe; // address can be generated from dpe after some mods ...
+            strreplace(address, "/", ".");
+            fwPeriphAddress_setOPCUA (
+                dpe /*dpe*/,
+                "<xsl:value-of select='$serverName'/>" /* server name*/,
+                <xsl:value-of select="$driverNumber"/>,
+                "ns=2;s="+address,
+                "" /* subscription*/,
+                1 /* kind */,
+                1 /* variant */,
+                750 /* datatype */,
+                <xsl:value-of select="fnc:sourceVariableToMode(@addressSpaceRead, @addressSpaceWrite)"/> /* mode */,
+                "" /*poll group */,
+                dsExceptionInfo
+                );
+        </xsl:for-each>       
+        }
         
         dyn_int children;
         <xsl:for-each select="d:hasobjects[@instantiateUsing='configuration']">
         children = getChildNodesWithName(docNum, childNode, "<xsl:value-of select='@class'/>");
         for (int i=1; i&lt;=dynlen(children); i++)
-        configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/");
+        configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError);
         </xsl:for-each>
         
     }
-    <!-- 
-        <xsl:call-template name="hasObjects">
-        <xsl:with-param name="parentClass">Root</xsl:with-param>
-        </xsl:call-template>  -->
+
     </xsl:for-each>
     
     dyn_int getChildNodesWithName (int docNum, int parentNode, string name)
@@ -88,7 +129,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         return result;
     }
     
-    int main (string configFileName)
+    int main (string configFileName, bool createDps, bool assignAddresses, bool continueOnError )
     /* Create instances */
     {
         string errMsg;
@@ -118,16 +159,19 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         }
         // now firstNode holds configuration node   
         dyn_int children;
-        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='configuration']">
-       
-        dyn_int children = getChildNodesWithName(docNum, firstNode, "<xsl:value-of select='@class'/>");
-        for (int i = 1; i&lt;=dynlen(children); i++)
-        {
-            configure<xsl:value-of select="@class"/> (docNum, children[i], "");
-        }
-       
+        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='configuration']">      
+            dyn_int children = getChildNodesWithName(docNum, firstNode, "<xsl:value-of select='@class'/>");
+            for (int i = 1; i&lt;=dynlen(children); i++)
+            {
+                configure<xsl:value-of select="@class"/> (docNum, children[i], "", createDps, assignAddresses, continueOnError);
+            }
         </xsl:for-each>
         
+        <!-- add support for design-based instantiation  
+        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='design']">      
+            
+        </xsl:for-each>   
+        -->     
         return 0;
     }
     
