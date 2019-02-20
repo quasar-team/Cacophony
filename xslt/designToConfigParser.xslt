@@ -14,24 +14,19 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     <xsl:param name="driverNumber"/>
     <xsl:param name="subscriptionName"/>
 	
-    <!--  
-    <xsl:template name="hasObjects">
-    <xsl:param name="parentClass"/>
-    <xsl:variable name="configuredClass"><xsl:value-of select="@class"/></xsl:variable>
 
-    
-    void <xsl:value-of select="$parentClass"/>Configures<xsl:value-of select="$configuredClass"/> ()
-    {
-    }
-     
-    </xsl:template>
-    -->
-    
-    
-    
+    <xsl:function name="fnc:cacheVariableToMode">
+    <xsl:param name="addressSpaceWrite"/>
+    <xsl:choose>
+    <xsl:when test="$addressSpaceWrite='forbidden'">DPATTR_ADDR_MODE_INPUT_SPONT</xsl:when>
+    <xsl:otherwise>DPATTR_ADDR_MODE_IO_SPONT</xsl:otherwise>
+    </xsl:choose>
+    </xsl:function>
+   
 	<xsl:template match="/">	
     // generated using Cacophony, an optional module of quasar
     // generated at: TODO
+    
     
     
     <xsl:for-each select="/d:design/d:class">
@@ -60,7 +55,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
             1 /* kind */,
             1 /* variant */,
             750 /* datatype */,
-            DPATTR_ADDR_MODE_INPUT_SPONT /* mode */,
+            <xsl:value-of select="fnc:cacheVariableToMode(@addressSpaceWrite)"/> /* mode */,
             "" /*poll group */,
             dsExceptionInfo
             );
