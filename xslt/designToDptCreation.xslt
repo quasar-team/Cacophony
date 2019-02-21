@@ -15,10 +15,14 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     <xsl:param name="dataType"/>
     <xsl:choose>
         <xsl:when test="$dataType='OpcUa_Boolean'">DPEL_BOOL</xsl:when>
-        <xsl:when test="$dataType='OpcUa_UInt16'">DPEL_UINT</xsl:when>
+        <xsl:when test="$dataType='OpcUa_Byte'"><xsl:message>Warning: mapped Byte to DPEL_UINT.</xsl:message>DPEL_UINT</xsl:when>
+        <xsl:when test="$dataType='OpcUa_SByte'"><xsl:message>Warning: mapped SByte to DPEL_INT.</xsl:message>DPEL_INT</xsl:when>
+	    <xsl:when test="$dataType='OpcUa_UInt16'"><xsl:message>Warning: mapped UInt16 to DPEL_UINT.</xsl:message>DPEL_UINT</xsl:when>
+	    <xsl:when test="$dataType='OpcUa_Int16'"><xsl:message>Warning: mapped Int16 to DPEL_INT.</xsl:message>DPEL_INT</xsl:when>
         <xsl:when test="$dataType='OpcUa_UInt32'">DPEL_UINT</xsl:when>
-	<xsl:when test="$dataType='OpcUa_Int32'">DPEL_INT</xsl:when>
+	    <xsl:when test="$dataType='OpcUa_Int32'">DPEL_INT</xsl:when>
         <xsl:when test="$dataType='OpcUa_UInt64'">DPEL_ULONG</xsl:when>
+	    <xsl:when test="$dataType='OpcUa_Int64'">DPEL_LONG</xsl:when>
         <xsl:when test="$dataType='OpcUa_Float'">DPEL_FLOAT</xsl:when>
         <xsl:when test="$dataType='OpcUa_Double'">DPEL_FLOAT</xsl:when>
         <xsl:when test="$dataType='UaString'">DPEL_STRING</xsl:when>
