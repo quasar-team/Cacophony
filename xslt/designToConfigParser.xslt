@@ -35,6 +35,9 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     </xsl:function>
    
 	<xsl:template match="/">	
+    <xsl:message terminate="no">
+        Note: typePrefix=<xsl:value-of select="$typePrefix"/>
+    </xsl:message>
     // generated using Cacophony, an optional module of quasar
     // generated at: TODO
     
@@ -53,13 +56,18 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         string name;
         xmlGetElementAttribute(docNum, childNode, "name", name);
         string fullName = prefix+name;
-        string dpt = "MyQuasarServer"+"<xsl:value-of select="@name"/>";
+        string dpt = "<xsl:value-of select="$typePrefix"/>"+"<xsl:value-of select="@name"/>";
         
         if (createDps)
         {
             DebugTN("Will create DP "+fullName);
             int result = dpCreate(fullName, dpt);
-            // TODO: error handling
+            if (result != 0)
+            {
+                DebugTN("dpCreate name='"+fullName+"' dpt='"+dpt+"' not successful or already existing");
+                if (!continueOnError)
+                    throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
+            }
         }
         
         if (assignAddresses)
