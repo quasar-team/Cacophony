@@ -95,11 +95,21 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     </xsl:call-template>   
     </xsl:for-each>
     
-    int main ()
+    int main (string dptFilter=".*")
     {
-        <xsl:for-each select="/d:design/d:class">
+    <xsl:for-each select="/d:design/d:class">
+      {
+      int result = regexpIndex(dptFilter, "<xsl:value-of select="@name"/>");
+      if (result >= 0)
+      {
             if (!createDpt<xsl:value-of select="@name"/>())
             return 1;
+	    }
+	    else
+	    {
+	       DebugN("DPT <xsl:value-of select="@name"/> not covered by provided dptFilter, skipping");
+	    }
+      }
         </xsl:for-each>
         return 0;
     }
