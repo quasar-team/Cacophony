@@ -9,7 +9,8 @@ xmlns:fnc="http://cern.ch/quasar/MyFunctions"
 xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for-xslt20.xsd ">
 	<xsl:include href="../../Design/CommonFunctions.xslt" />
 	<xsl:output method="text"></xsl:output>
-    <xsl:param name="typePrefix"/>
+	<xsl:param name="typePrefix"/>
+	<xsl:param name="functionPrefix"/>
 	
     <xsl:function name="fnc:quasarDataTypeToDptTypeConstant">
     <xsl:param name="dataType"/>
@@ -38,7 +39,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     <xsl:template name="classToDpt">
     <xsl:param name="className"/>
     //<xsl:value-of select="$className"/>
-    bool createDpt<xsl:value-of select="@name"/>()
+    bool <xsl:value-of select="$functionPrefix"/>createDpt<xsl:value-of select="@name"/>()
     {
     // the names of vars and the way of generating DPT come directly from examples of dpTypeCreate
     dyn_dyn_string xxdepes;
@@ -86,8 +87,8 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     </xsl:template>
 	
 	<xsl:template match="/">	
-    // generated using Cacophony, an optional module of quasar
-    // generated at: TODO
+    // generated using Cacophony, an optional module of quasar, see: https://github.com/quasar-team/Cacophony
+    // generated on <xsl:value-of  select="current-date()"/>
     
     <xsl:for-each select="/d:design/d:class">
     <xsl:call-template name="classToDpt">
@@ -102,7 +103,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
       int result = regexpIndex(dptFilter, "<xsl:value-of select="@name"/>");
       if (result >= 0)
       {
-            if (!createDpt<xsl:value-of select="@name"/>())
+            if (!<xsl:value-of select="$functionPrefix"/>createDpt<xsl:value-of select="@name"/>())
             return 1;
 	    }
 	    else

@@ -15,13 +15,15 @@ def main():
 	parser.add_argument("--server_name", dest="server_name", default="QUASAR_SERVER")
 	parser.add_argument("--driver_number", dest="driver_number", default="69")
 	parser.add_argument("--subscription", dest="subscription", default="MyQuasarSubscription")
+        parser.add_argument("--function_prefix", dest="function_prefix", default="")
 	args = parser.parse_args()
 	
 	additionalParams=[
 		'typePrefix={0}'.format(args.dpt_prefix), 
 		'serverName={0}'.format(args.server_name),
 		'driverNumber={0}'.format(args.driver_number),
-		'subscriptionName={0}'.format(args.subscription)]
+		'subscriptionName={0}'.format(args.subscription),
+                'functionPrefix={0}'.format(args.function_prefix)]
 	
 	transformDesign(
 		xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToDptCreation.xslt'), 
