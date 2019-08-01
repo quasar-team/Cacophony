@@ -33,13 +33,6 @@ def main():
 		additionalParam=additionalParams)
 	
 	transformDesign(
-		xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToDeviceDefinition.xslt'), 
-		outputFile=os.path.join(thisModuleName, 'generated', 'createDeviceDefinitions.ctl'), 
-		requiresMerge=False, 
-		astyleRun=True, 
-		additionalParam=additionalParams)	
-
-	transformDesign(
 		xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToConfigParser.xslt'), 
 		outputFile=os.path.join(thisModuleName, 'generated', 'configParser.ctl'), 
 		requiresMerge=False, 
