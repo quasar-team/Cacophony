@@ -48,13 +48,18 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     bool active=false
     )
     {
+    string subscription = "";
+    if (mode != DPATTR_ADDR_MODE_IO_SQUERY &amp;&amp; mode != DPATTR_ADDR_MODE_INPUT_SQUERY)
+    {
+      subscription = "<xsl:value-of select='$subscriptionName'/>";
+    }
             dyn_string dsExceptionInfo;
             fwPeriphAddress_setOPCUA (
                 dpe /*dpe*/,
                 "<xsl:value-of select='$serverName'/>" /* server name*/,
                 <xsl:value-of select="$driverNumber"/>,
                 "ns=2;s="+address,
-                "<xsl:value-of select='$subscriptionName'/>" /* subscription*/,
+                subscription /* subscription*/,
                 1 /* kind */,
                 1 /* variant */,
                 750 /* datatype */,
@@ -73,7 +78,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     
     
     <xsl:for-each select="/d:design/d:class">
-    void <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@name"/> (
+    bool <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@name"/> (
         int docNum, 
         int childNode, 
         string prefix,
