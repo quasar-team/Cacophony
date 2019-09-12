@@ -96,7 +96,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     </xsl:call-template>   
     </xsl:for-each>
     
-    int main (string dptFilter=".*")
+    int <xsl:value-of select="$functionPrefix"/>createDpts (string dptFilter=".*")
     {
     <xsl:for-each select="/d:design/d:class">
       {
