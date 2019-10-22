@@ -181,21 +181,22 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 
 	string configFileToLoad = configFileName;
 
-   if (_UNIX)
-   {
+	if (! _UNIX)
+	{
+	DebugTN("This code was validated only on Linux systems. For Windows, BE-ICS should perform the validation and release the component. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
+	return -1;
+	}
+	
       // try to perform entity substitution
       string tempFile = configFileToLoad + ".temp";
       int result = system("xmllint --noent " + configFileToLoad + " > " + tempFile);
       DebugTN("The call to 'xmllint --noent' resulted in: "+result);
-      if (result == 0)
+      if (result != 0)
       {
-        configFileToLoad = tempFile;
+	  DebugTN("It was impossible to run xmllint to inflate entities. WinCC OA might load this file incorrectly if entity references are used. So we decided it wont be possible. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
+	  return -1;
 	}
-	else
-	{
-	  DebugTN("It was impossible to run xmllint to inflate entities. WinCC OA might load this file incorrectly if entity references are used.");
-	}
-    } 
+	configFileToLoad = tempFile;
 
 	int docNum = xmlDocumentFromFile(configFileToLoad , errMsg, errLine, errColumn);
         if (docNum &lt; 0)
