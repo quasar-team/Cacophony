@@ -177,7 +177,27 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         string errMsg;
         int errLine;
         int errColumn;
-        int docNum = xmlDocumentFromFile(configFileName, errMsg, errLine, errColumn);
+
+
+	string configFileToLoad = configFileName;
+
+   if (_UNIX)
+   {
+      // try to perform entity substitution
+      string tempFile = configFileToLoad + ".temp";
+      int result = system("xmllint --noent " + configFileToLoad + " > " + tempFile);
+      DebugTN("The call to 'xmllint --noent' resulted in: "+result);
+      if (result == 0)
+      {
+        configFileToLoad = tempFile;
+	}
+	else
+	{
+	  DebugTN("It was impossible to run xmllint to inflate entities. WinCC OA might load this file incorrectly if entity references are used.");
+	}
+    } 
+
+	int docNum = xmlDocumentFromFile(configFileToLoad , errMsg, errLine, errColumn);
         if (docNum &lt; 0)
         {
             DebugN("Didn't open the file: at Line="+errLine+" Column="+errColumn+" Message=" + errMsg);
