@@ -45,7 +45,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     string dpe,
     string address,
     int mode,
-    bool active=false
+    bool active=true
     )
     {
     string subscription = "";
@@ -69,22 +69,50 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
                 );
 	    if (dynlen(dsExceptionInfo)>0)
 		return false;
-	    else
-		return true;
-	    dpSet(dpe + ":_address.._active", active);
+
+        DebugTN("Setting active on dpe: "+dpe+" to "+active);
+	    dpSetWait(dpe + ":_address.._active", active);
+            
+        return true;
 		
     
     }
     
+    bool <xsl:value-of select="$functionPrefix"/>evaluateActive(
+        mapping addressActiveControl,
+        string className,
+        string varName,
+        string dpe)
+    {
+        bool active = false;
+        if (mappingHasKey(addressActiveControl, className)) <!-- we're query for the class name in the mapping -->
+        {
+          string regex = addressActiveControl[className];
+          int regexMatchResult = regexpIndex(regex, varName, makeMapping("caseSensitive", true));
+          DebugTN("The result of evaluating regex: '"+regex+"' with string: '"+varName+" was: "+regexMatchResult);
+          if (regexMatchResult>=0)
+            active = true;
+          else
+          {
+            active = false;
+            DebugN("Note: the address on dpe: "+dpe+" will be non-active because such instructions were passed in the addressActive mapping.");
+          }
+        }
+        else
+          active = true; // by default
+        return active;
+    }
     
     <xsl:for-each select="/d:design/d:class">
+    <xsl:variable name="className"><xsl:value-of select="@name"/></xsl:variable>
     bool <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@name"/> (
-        int docNum, 
-        int childNode, 
-        string prefix,
-        bool createDps, 
-        bool assignAddresses, 
-        bool continueOnError)
+        int     docNum, 
+        int     childNode, 
+        string  prefix,
+        bool    createDps, 
+        bool    assignAddresses, 
+        bool    continueOnError,
+        mapping addressActiveControl)
     {
         DebugTN("Configure.<xsl:value-of select="@name"/> called");
         string name;
@@ -108,16 +136,26 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         {
         string dpe, address;
         dyn_string dsExceptionInfo;
-	bool success;
+	    bool success;
+        bool active = false;
+
+        
         <xsl:for-each select="d:cachevariable">
             dpe = fullName+".<xsl:value-of select='@name'/>";
             address = dpe; // address can be generated from dpe after some mods ...
             strreplace(address, "/", ".");
-
+       
+        active = <xsl:value-of select="$functionPrefix"/>evaluateActive(
+          addressActiveControl,
+          "<xsl:value-of select="$className"/>",
+          "<xsl:value-of select='@name'/>",
+          dpe);
+       
 	    success = <xsl:value-of select="$functionPrefix"/>addressConfigWrapper(
 	    dpe,
 	    address,
-	    <xsl:value-of select="fnc:cacheVariableToMode(@addressSpaceWrite)"/> /* mode */);
+	    <xsl:value-of select="fnc:cacheVariableToMode(@addressSpaceWrite)"/> /* mode */,
+        active);
 
 	    if (!success)
 	    {
@@ -132,10 +170,17 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
             address = dpe; // address can be generated from dpe after some mods ...
             strreplace(address, "/", ".");
 
+        active = <xsl:value-of select="$functionPrefix"/>evaluateActive(
+          addressActiveControl,
+          "<xsl:value-of select="$className"/>",
+          "<xsl:value-of select='@name'/>",
+          dpe);
+
 	    success = <xsl:value-of select="$functionPrefix"/>addressConfigWrapper(
 	    dpe,
 	    address,
-	    <xsl:value-of select="fnc:sourceVariableToMode(@addressSpaceRead, @addressSpaceWrite)"/> /* mode */);
+	    <xsl:value-of select="fnc:sourceVariableToMode(@addressSpaceRead, @addressSpaceWrite)"/> /* mode */,
+        active);
 	    
 	    if (!success)
 	    {
@@ -151,7 +196,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         <xsl:for-each select="d:hasobjects[@instantiateUsing='configuration']">
         children = <xsl:value-of select="$functionPrefix"/>getChildNodesWithName(docNum, childNode, "<xsl:value-of select='@class'/>");
         for (int i=1; i&lt;=dynlen(children); i++)
-        <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError);
+        <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl);
         </xsl:for-each>
         
     }
@@ -171,9 +216,27 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         return result;
     }
     
-    int <xsl:value-of select="$functionPrefix"/>parseConfig (string configFileName, bool createDps, bool assignAddresses, bool continueOnError )
+    int <xsl:value-of select="$functionPrefix"/>parseConfig (
+        string  configFileName, 
+        bool    createDps, 
+        bool    assignAddresses, 
+        bool    continueOnError,  
+        mapping addressActiveControl = makeMapping())
     /* Create instances */
     {
+        
+    /* Check if given patterns make sense */
+    for (int i=0; i&lt;=mappinglen(addressActiveControl); i++)
+    {
+        string regexp = mappingGetValue(addressActiveControl, i);
+        int regexpResult = regexpIndex(regexp, "thisdoesntmatter");
+        if (regexpResult &lt;= -2)
+        {
+            DebugTN("It seems that the given regular expression is wrong: "+regexp+"    the process will be aborted");
+            return -1;
+        }
+    }
+    
         string errMsg;
         int errLine;
         int errColumn;
@@ -226,7 +289,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
             dyn_int children = <xsl:value-of select="$functionPrefix"/>getChildNodesWithName(docNum, firstNode, "<xsl:value-of select='@class'/>");
             for (int i = 1; i&lt;=dynlen(children); i++)
             {
-                <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], "", createDps, assignAddresses, continueOnError);
+                <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl);
             }
         </xsl:for-each>
         
