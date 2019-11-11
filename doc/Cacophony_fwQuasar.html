@@ -1,0 +1,57 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>Cacophony/fwQuasar</title>
+  </head>
+  <body>
+    <h1>This is Cacophony, the work-horse of the fwQuasar</h1>
+    Written by Piotr P. Nikiel at different moments in 2019<br>
+    <h2>A quick intro</h2>
+    <p>fwQuasar is a JCOP-style framework to quickly integrate
+      quasar-made OPC-UA servers into WinCC OA projects.<br>
+      fwQuasar is just a graphical tool but the real work of creating
+      DP(T)(E)s, assigning addresses etc. is achieved by Cacophony, of
+      which README you are reading now.<br>
+    </p>
+    <h2>Notes<br>
+    </h2>
+    <h3>Address assignment and address activation<br>
+    </h3>
+    <p>By a rule of thumb, an OPC-UA peripheral address <b>will always
+        be assigned</b> to DPEs per every cache- or source-variable.<br>
+      Since the implementation of OPCUA-1457 one can select though which
+      addresses will be activated.<br>
+      The information shall be passed to invocation of the <i>config
+        parser</i> function, i.e. the one of general form
+      &lt;prefix&gt;parseConfig as the 5th argument called
+      addressActiveControl.<br>
+    </p>
+    <p>The argument is a mapping; its key matches the quasar class name
+      whose activation shall be controlled and the value is a regular
+      expression matching variable names.<br>
+      No key means that all variables in the class will be activated.<br>
+    </p>
+    <p>The general guideline to specifying address activation per quasar
+      class is the following:<br>
+      <br>
+    </p>
+    <ul>
+      <li>if you need all variables to be activated, simply do not
+        insert the class name into the mapping</li>
+      <li>if you need none of the variables to be activated, insert ""
+        (i.e. empty string) per the key</li>
+      <li>if you need just one variable to be activated, just put its
+        name, e.g. "rawValue"</li>
+      <li>if you need few variables, use the alternative symbolised by
+        the vertical bar, e.g. "id|state|status|numberOfPackets"</li>
+      <li>if you need a more advanced expression, for example a negative
+        expression, contact Piotr ;-)<br>
+      </li>
+    </ul>
+    <p>For developers: Cacophony prefixes the given regex with "^" and
+      suffixes with "$" so that exact matches are always done.<br>
+    </p>
+  </body>
+</html>
