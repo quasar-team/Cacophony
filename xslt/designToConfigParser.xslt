@@ -225,10 +225,12 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     /* Create instances */
     {
         
-    /* Check if given patterns make sense */
+    /* Pre/Suffix the expression with ^$ to enable exact matches and also check if given patterns make sense */
     for (int i=0; i&lt;=mappinglen(addressActiveControl); i++)
     {
-        string regexp = mappingGetValue(addressActiveControl, i);
+    string regexp = mappingGetValue(addressActiveControl, i);
+    regexp = "^"+regexp+"$";
+    addressActiveControl[mappingGetKey(addressActiveControl, i)] = regexp;
         int regexpResult = regexpIndex(regexp, "thisdoesntmatter");
         if (regexpResult &lt;= -2)
         {
