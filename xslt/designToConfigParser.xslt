@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- author pnikiel -->
-<xsl:transform version="2.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" 
-xmlns:xs="http://www.w3.org/2001/XMLSchema" 
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-xmlns:xsl="http://www.w3.org/1999/XSL/Transform" 
+<xsl:transform version="2.0" xmlns:xml="http://www.w3.org/XML/1998/namespace"
+xmlns:xs="http://www.w3.org/2001/XMLSchema"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 xmlns:d="http://cern.ch/quasar/Design"
 xmlns:fnc="http://cern.ch/quasar/MyFunctions"
 xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for-xslt20.xsd ">
@@ -13,7 +13,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     <xsl:param name="serverName"/>
     <xsl:param name="driverNumber"/>
     <xsl:param name="subscriptionName"/>
-    <xsl:param name="functionPrefix"/>	
+    <xsl:param name="functionPrefix"/>
 
     <xsl:function name="fnc:cacheVariableToMode">
     <xsl:param name="addressSpaceWrite"/>
@@ -22,7 +22,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     <xsl:otherwise>DPATTR_ADDR_MODE_IO_SPONT</xsl:otherwise>
     </xsl:choose>
     </xsl:function>
-   
+
     <xsl:function name="fnc:sourceVariableToMode">
     <xsl:param name="addressSpaceRead"/>
     <xsl:param name="addressSpaceWrite"/>
@@ -33,31 +33,36 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
     <xsl:otherwise><xsl:message terminate="yes">Don't know how to map this address because it support neither read nor write...</xsl:message></xsl:otherwise>
     </xsl:choose>
     </xsl:function>
-   
-	<xsl:template match="/">	
+
+	<xsl:template match="/">
     <xsl:message terminate="no">
         Note: typePrefix=<xsl:value-of select="$typePrefix"/>
     </xsl:message>
     // generated using Cacophony, an optional module of quasar, see: https://github.com/quasar-team/Cacophony
     // generated on <xsl:value-of  select="current-date()"/>
 
+		const string CONNECTIONSETTING_KEY_DRIVER_NUMBER = "DRIVER_NUMBER";
+		const string CONNECTIONSETTING_KEY_SERVER_NAME = "SERVER_NAME";
+		const string CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME = "SUBSCRIPTION_NAME";
+
     bool <xsl:value-of select="$functionPrefix"/>addressConfigWrapper (
-    string dpe,
-    string address,
-    int mode,
+    string  dpe,
+    string  address,
+    int     mode,
+		mapping connectionSettings,
     bool active=true
     )
     {
     string subscription = "";
     if (mode != DPATTR_ADDR_MODE_IO_SQUERY &amp;&amp; mode != DPATTR_ADDR_MODE_INPUT_SQUERY)
     {
-      subscription = "<xsl:value-of select='$subscriptionName'/>";
+      subscription = connectionSettings[CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME];
     }
             dyn_string dsExceptionInfo;
             fwPeriphAddress_setOPCUA (
                 dpe /*dpe*/,
-                "<xsl:value-of select='$serverName'/>" /* server name*/,
-                <xsl:value-of select="$driverNumber"/>,
+                connectionSettings[CONNECTIONSETTING_KEY_SERVER_NAME],
+                connectionSettings[CONNECTIONSETTING_KEY_DRIVER_NUMBER],
                 "ns=2;s="+address,
                 subscription /* subscription*/,
                 1 /* kind */,
@@ -72,12 +77,12 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 
         DebugTN("Setting active on dpe: "+dpe+" to "+active);
 	    dpSetWait(dpe + ":_address.._active", active);
-            
+
         return true;
-		
-    
+
+
     }
-    
+
     bool <xsl:value-of select="$functionPrefix"/>evaluateActive(
         mapping addressActiveControl,
         string className,
@@ -102,24 +107,25 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
           active = true; // by default
         return active;
     }
-    
+
     <xsl:for-each select="/d:design/d:class">
     <xsl:variable name="className"><xsl:value-of select="@name"/></xsl:variable>
     bool <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@name"/> (
-        int     docNum, 
-        int     childNode, 
+        int     docNum,
+        int     childNode,
         string  prefix,
-        bool    createDps, 
-        bool    assignAddresses, 
+        bool    createDps,
+        bool    assignAddresses,
         bool    continueOnError,
-        mapping addressActiveControl)
+        mapping addressActiveControl,
+				mapping connectionSettings)
     {
         DebugTN("Configure.<xsl:value-of select="@name"/> called");
         string name;
         xmlGetElementAttribute(docNum, childNode, "name", name);
         string fullName = prefix+name;
         string dpt = "<xsl:value-of select="$typePrefix"/>"+"<xsl:value-of select="@name"/>";
-        
+
         if (createDps)
         {
             DebugTN("Will create DP "+fullName);
@@ -131,7 +137,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
                     throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
             }
         }
-        
+
         if (assignAddresses)
         {
         string dpe, address;
@@ -139,22 +145,23 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 	    bool success;
         bool active = false;
 
-        
+
         <xsl:for-each select="d:cachevariable">
             dpe = fullName+".<xsl:value-of select='@name'/>";
             address = dpe; // address can be generated from dpe after some mods ...
             strreplace(address, "/", ".");
-       
+
         active = <xsl:value-of select="$functionPrefix"/>evaluateActive(
           addressActiveControl,
           "<xsl:value-of select="$className"/>",
           "<xsl:value-of select='@name'/>",
           dpe);
-       
+
 	    success = <xsl:value-of select="$functionPrefix"/>addressConfigWrapper(
 	    dpe,
 	    address,
 	    <xsl:value-of select="fnc:cacheVariableToMode(@addressSpaceWrite)"/> /* mode */,
+			connectionSettings,
         active);
 
 	    if (!success)
@@ -162,9 +169,9 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 	       DebugTN("Failed setting address "+address+"; will terminate now.");
 	       return false;
 	    }
-	    
+
         </xsl:for-each>
-        
+
          <xsl:for-each select="d:sourcevariable">
             dpe = fullName+".<xsl:value-of select='@name'/>";
             address = dpe; // address can be generated from dpe after some mods ...
@@ -180,29 +187,30 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 	    dpe,
 	    address,
 	    <xsl:value-of select="fnc:sourceVariableToMode(@addressSpaceRead, @addressSpaceWrite)"/> /* mode */,
+			connectionSettings,
         active);
-	    
+
 	    if (!success)
 	    {
 	       DebugTN("Failed setting address "+address+"; will terminate now.");
 	       return false;
 	    }
-	    
-            
-        </xsl:for-each>       
+
+
+        </xsl:for-each>
         }
-        
+
         dyn_int children;
         <xsl:for-each select="d:hasobjects[@instantiateUsing='configuration']">
         children = <xsl:value-of select="$functionPrefix"/>getChildNodesWithName(docNum, childNode, "<xsl:value-of select='@class'/>");
         for (int i=1; i&lt;=dynlen(children); i++)
-        <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl);
+        <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
         </xsl:for-each>
-        
+
     }
 
     </xsl:for-each>
-    
+
     dyn_int <xsl:value-of select="$functionPrefix"/>getChildNodesWithName (int docNum, int parentNode, string name)
     {
         dyn_int result;
@@ -215,16 +223,31 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
         }
         return result;
     }
-    
+
     int <xsl:value-of select="$functionPrefix"/>parseConfig (
-        string  configFileName, 
-        bool    createDps, 
-        bool    assignAddresses, 
-        bool    continueOnError,  
-        mapping addressActiveControl = makeMapping())
+        string  configFileName,
+        bool    createDps,
+        bool    assignAddresses,
+        bool    continueOnError,
+        mapping addressActiveControl = makeMapping(),
+				mapping connectionSettings = makeMapping())
     /* Create instances */
     {
-        
+
+		/* Apply defaults in connectionSettings, when not concretized by the user */
+		if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_DRIVER_NUMBER))
+		{
+			connectionSettings[CONNECTIONSETTING_KEY_DRIVER_NUMBER] = <xsl:value-of select="$driverNumber"/>;
+		}
+		if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_SERVER_NAME))
+		{
+			connectionSettings[CONNECTIONSETTING_KEY_SERVER_NAME] = "<xsl:value-of select='$serverName'/>";
+		}
+		if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME))
+		{
+			connectionSettings[CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME] = "<xsl:value-of select='$subscriptionName'/>";
+		}
+
     /* Pre/Suffix the expression with ^$ to enable exact matches and also check if given patterns make sense */
     for (int i=1; i&lt;=mappinglen(addressActiveControl); i++)
     {
@@ -238,7 +261,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
             return -1;
         }
     }
-    
+
         string errMsg;
         int errLine;
         int errColumn;
@@ -251,7 +274,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
 	DebugTN("This code was validated only on Linux systems. For Windows, BE-ICS should perform the validation and release the component. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
 	return -1;
 	}
-	
+
       // try to perform entity substitution
       string tempFile = configFileToLoad + ".temp";
       int result = system("xmllint --noent " + configFileToLoad + " > " + tempFile);
@@ -269,7 +292,7 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
             DebugN("Didn't open the file: at Line="+errLine+" Column="+errColumn+" Message=" + errMsg);
             return -1;
         }
-               
+
         int firstNode = xmlFirstChild(docNum);
         if (firstNode &lt; 0)
         {
@@ -285,24 +308,24 @@ xsi:schemaLocation="http://www.w3.org/1999/XSL/Transform ../../Design/schema-for
                 return -1;
             }
         }
-        // now firstNode holds configuration node   
+        // now firstNode holds configuration node
         dyn_int children;
-        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='configuration']">      
+        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='configuration']">
             dyn_int children = <xsl:value-of select="$functionPrefix"/>getChildNodesWithName(docNum, firstNode, "<xsl:value-of select='@class'/>");
             for (int i = 1; i&lt;=dynlen(children); i++)
             {
-                <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl);
+                <xsl:value-of select="$functionPrefix"/>configure<xsl:value-of select="@class"/> (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
             }
         </xsl:for-each>
-        
-        <!-- add support for design-based instantiation  
-        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='design']">      
-            
-        </xsl:for-each>   
-        -->     
+
+        <!-- add support for design-based instantiation
+        <xsl:for-each select="/d:design/d:root/d:hasobjects[@instantiateUsing='design']">
+
+        </xsl:for-each>
+        -->
         return 0;
     }
-    
+
     </xsl:template>
 
 
