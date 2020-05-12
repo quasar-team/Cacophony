@@ -19,15 +19,17 @@ def main():
     parser.add_argument("--function_prefix", dest="function_prefix", default="")
     args = parser.parse_args()
 
-    additional_params = [
+    additional_params = [ # TODO make it a dictionary
         'typePrefix={0}'.format(args.dpt_prefix),
         'serverName={0}'.format(args.server_name),
         'driverNumber={0}'.format(args.driver_number),
         'subscriptionName={0}'.format(args.subscription),
         'functionPrefix={0}'.format(args.function_prefix)]
 
+    cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
+    print('Cacophony root is at: ' + cacophony_root)
     transformDesign(
-        xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToDptCreation.xslt'),
+        xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
         outputFile=os.path.join(thisModuleName, 'generated', 'createDpts.ctl'),
         requiresMerge=False,
         astyleRun=True,

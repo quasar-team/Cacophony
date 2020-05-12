@@ -1,0 +1,62 @@
+// generated using Cacophony, an optional module of quasar, see: https://github.com/quasar-team/Cacophony
+
+{% for class_name in designInspector.get_names_of_all_classes() %}
+{% set cls = designInspector.objectify_class(class_name) %}
+
+bool {{functionPrefix}}createDpt{{cls.get('name')}}()
+{
+  // the names of vars and the way of generating DPT come directly from examples of dpTypeCreate
+  dyn_dyn_string xxdepes;
+  dyn_dyn_int xxdepei;
+  dynAppend(xxdepes, makeDynString("{{typePrefix}}{{cls.get('name')}}", ""));
+  dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
+  {% for cv in cls.cachevariable %}
+    {% if cv.array|length>0 %}
+      {{"WARNING: Skipping array cache-variable. There is no support for arrays in Cacophony yet. 
+         You can request it from Piotr."|debug}}
+    {% else %} {# scalar #}
+      dynAppend(xxdepes, makeDynString("", "{{cv.get('name')}}"));
+      dynAppend(xxdepei, makeDynInt(0, 
+      <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>)); {# TODO #}
+    {% endif %}
+  {% endfor %}
+  
+  {% for sv in cls.sourcevariable %}
+    {% if sv.array|length>0 %}
+      {{"WARNING: Skipping array source-variable. There is no support for arrays in Cacophony yet. 
+         You can request it from Piotr."|debug}}
+    {% else %} {# scalar #}
+      dynAppend(xxdepes, makeDynString("", "<xsl:value-of select='@name'/>"));
+      dynAppend(xxdepei, makeDynInt(0, 
+      <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>));
+    {% endif %}
+  {% endfor %}
+  
+  {% if cls.method|length>0 %}
+    {{"WARNING Class has method(s) but there is no method support in WinCC OA, skipping!"|debug}}
+  {% endif %}
+
+  int status = dpTypeCreate(xxdepes, xxdepei);
+  return status == 0;
+}
+{% endfor %}
+
+int {{functionPrefix}}createDpts (string dptFilter=".*")
+{
+  {% for class_name in designInspector.get_names_of_all_classes() %}
+    {% set cls = designInspector.objectify_class(class_name) %}
+    {
+      int result = regexpIndex(dptFilter, "{{cls.get('name')}}");
+      if (result >= 0)
+      {
+        if (!{{functionPrefix}}createDpt{{cls.get('name')}}())
+        return 1;
+      }
+      else
+      {
+        DebugN("DPT {{cls.get('name')}} not covered by provided dptFilter, skipping");
+      }
+    }
+  {% endfor %}
+    return 0;
+}
