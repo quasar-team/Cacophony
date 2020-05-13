@@ -16,8 +16,7 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
          You can request it from Piotr."|debug}}
     {% else %} {# scalar #}
       dynAppend(xxdepes, makeDynString("", "{{cv.get('name')}}"));
-      dynAppend(xxdepei, makeDynInt(0, 
-      <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>)); {# TODO #}
+      dynAppend(xxdepei, makeDynInt(0, {{mapper(cv.get('dataType'))}})); 
     {% endif %}
   {% endfor %}
   
@@ -26,14 +25,13 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
       {{"WARNING: Skipping array source-variable. There is no support for arrays in Cacophony yet. 
          You can request it from Piotr."|debug}}
     {% else %} {# scalar #}
-      dynAppend(xxdepes, makeDynString("", "<xsl:value-of select='@name'/>"));
-      dynAppend(xxdepei, makeDynInt(0, 
-      <xsl:value-of select='fnc:quasarDataTypeToDptTypeConstant(@dataType)'/>));
+      dynAppend(xxdepes, makeDynString("", "{{sv.get('name')}}"));
+      dynAppend(xxdepei, makeDynInt(0, {{mapper(sv.get('dataType'))}}));
     {% endif %}
   {% endfor %}
   
   {% if cls.method|length>0 %}
-    {{"WARNING Class has method(s) but there is no method support in WinCC OA, skipping!"|debug}}
+    {{"WARNING: Class has method(s) but there is no method support in WinCC OA, skipping!"|debug}}
   {% endif %}
 
   int status = dpTypeCreate(xxdepes, xxdepei);
