@@ -3,6 +3,7 @@
 import sys
 import os
 import argparse
+from colorama import Fore, Style
 
 thisModuleName = "Cacophony"
 
@@ -59,9 +60,13 @@ def main():
         'serverName'       : args.server_name,
         'driverNumber'     : args.driver_number,
         'subscriptionName' : args.subscription,
-        'functionPrefix'   : args.function_prefix,
-        'mapper'           : quasar_data_type_to_dpt_type_constant
-        }
+        'functionPrefix'   : args.function_prefix}
+    
+    print(Fore.GREEN + "For your information, current settings are: \n" + Fore.BLUE
+        + '\n'.join([('  {0:20} : {1}'.format(k, additional_params[k])) for k in additional_params.keys()])
+        + Style.RESET_ALL)
+    
+    additional_params.update({'mapper' : quasar_data_type_to_dpt_type_constant})
 
     cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
     print('Cacophony root is at: ' + cacophony_root)
