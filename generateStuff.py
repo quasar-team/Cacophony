@@ -72,17 +72,17 @@ def main():
     print('Cacophony root is at: ' + cacophony_root)
     transformDesign(
         xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
-        outputFile=os.path.join(thisModuleName, 'generated', 'createDpts.ctl'),
+        outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
         requiresMerge=False,
         astyleRun=True,
         additionalParam=additional_params)
 
-    # transformDesign(
-    #     xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToConfigParser.xslt'),
-    #     outputFile=os.path.join(thisModuleName, 'generated', 'configParser.ctl'),
-    #     requiresMerge=False,
-    #     astyleRun=True,
-    #     additionalParam=additional_params)
+    transformDesign(
+        xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
+        outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
+        requiresMerge=False,
+        astyleRun=True,
+        additionalParam=additional_params)
 
 if __name__ == "__main__":
     main()
