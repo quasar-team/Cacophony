@@ -10,6 +10,7 @@ thisModuleName = "Cacophony"
 sys.path.insert(0, 'FrameworkInternals')
 
 from transformDesign import transformDesign
+import quasar_basic_utils
 
 # we use template_debug to print out to keep uniform debug style with what comes out as debug
 # from the transform itself
@@ -27,22 +28,23 @@ ObviousMapping = {  # these are unanimously good choices
     'UaByteString'  : "DPEL_BLOB"
     }
 
-def quasar_data_type_to_dpt_type_constant(quasar_data_type):
+LessObviousMapping = {
+    'OpcUa_Byte'    : 'DPEL_UINT',
+    'OpcUa_SByte'   : 'DPEL_INT',
+    'OpcUa_UInt16'  : 'DPEL_UINT',
+    'OpcUa_Int16'   : 'DPEL_INT'
+}
+
+
+def quasar_data_type_to_dpt_type_constant(quasar_data_type, cls, cv):
     if quasar_data_type in ObviousMapping:
         return ObviousMapping[quasar_data_type]
     # for the remaining types, we have to do less obvious choices.
-    elif quasar_data_type == 'OpcUa_Byte':
-        template_debug("WARNING: mapped OpcUa_Byte to DPEL_UINT, because of no corresponding type in WinCC OA.")
-        return "DPEL_UINT";
-    elif quasar_data_type == 'OpcUa_SByte':
-        template_debug("WARNING: mapped OpcUa_SByte to DPEL_INT, because of no corresponding type in WinCC OA.")
-        return "DPEL_INT";
-    elif quasar_data_type == 'OpcUa_UInt16':
-        template_debug("WARNING: mapped OpcUa_UInt16 to DPEL_UINT, because of no corresponding type in WinCC OA.")
-        return "DPEL_UINT";
-    elif quasar_data_type == 'OpcUa_Int16':
-        template_debug("WARNING: mapped OpcUa_Int16 to DPEL_INT, because of no corresponding type in WinCC OA.")
-        return "DPEL_INT";
+    elif quasar_data_type in LessObviousMapping:
+        to = LessObviousMapping[quasar_data_type]
+        template_debug(("WARNING: mapped {0} to {1}, because of no corresponding type in WinCC OA. "
+                        "(at: class={2} cv={3})").format(quasar_data_type, to, cls, cv))
+        return to
     else:
         raise Exception("The following quasar datatype: '{0}' is not yet supported in Cacophony.".format(quasar_data_type))
 
@@ -70,19 +72,21 @@ def main():
 
     cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
     print('Cacophony root is at: ' + cacophony_root)
-    transformDesign(
-        xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
-        outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
-        requiresMerge=False,
-        astyleRun=True,
-        additionalParam=additional_params)
+    try:
+        transformDesign(
+            xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
+            outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
+            requiresMerge=False,
+            astyleRun=True,
+            additionalParam=additional_params)
 
-    transformDesign(
-        xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
-        outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
-        requiresMerge=False,
-        astyleRun=True,
-        additionalParam=additional_params)
-
+        transformDesign(
+            xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
+            outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
+            requiresMerge=False,
+            astyleRun=True,
+            additionalParam=additional_params)
+    except:
+        quasar_basic_utils.quasaric_exception_handler()
 if __name__ == "__main__":
     main()

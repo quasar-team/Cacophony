@@ -13,6 +13,7 @@
   {%- elif asread != 'forbidden' and aswrite == 'forbidden' %}DPATTR_ADDR_MODE_INPUT_SQUERY
   {%- elif asread == 'forbidden' and aswrite != 'forbidden' %}DPATTR_ADDR_MODE_OUTPUT_SINGLE
   {%- else %}
+    {{debug("ERROR: settings of this source-variable don't make much sense")}}
   error('Don't know how to map this address because it support neither read nor write...');
   {% endif %}
 {% endmacro %}
@@ -181,3 +182,124 @@ bool {{functionPrefix}}configure{{class_name}} (
 }
 
 {% endfor %}
+
+dyn_int {{functionPrefix}}getChildNodesWithName (int docNum, int parentNode, string name)
+{
+    dyn_int result;
+    int node = xmlFirstChild(docNum, parentNode);
+    while (node >= 0)
+    {
+        if (xmlNodeName(docNum, node)==name)
+            dynAppend(result, node);
+        node = xmlNextSibling (docNum, node);
+    }
+    return result;
+}
+
+int {{functionPrefix}}parseConfig (
+    string  configFileName,
+    bool    createDps,
+    bool    assignAddresses,
+    bool    continueOnError,
+    mapping addressActiveControl = makeMapping(),
+    mapping connectionSettings = makeMapping())
+/* Create instances */
+{
+
+  /* Apply defaults in connectionSettings, when not concretized by the user */
+  if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_DRIVER_NUMBER))
+  {
+    connectionSettings[CONNECTIONSETTING_KEY_DRIVER_NUMBER] = {{driverNumber}};
+  }
+  if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_SERVER_NAME))
+  {
+    connectionSettings[CONNECTIONSETTING_KEY_SERVER_NAME] = "{{serverName}}";
+  }
+  if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME))
+  {
+    connectionSettings[CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME] = "{{subscriptionName}}";
+  }
+
+  /* Pre/Suffix the expression with ^$ to enable exact matches and also check if given patterns make sense */
+  for (int i=1; i<=mappinglen(addressActiveControl); i++)
+  {
+    string regexp = mappingGetValue(addressActiveControl, i);
+    regexp = "^"+regexp+"$";
+    addressActiveControl[mappingGetKey(addressActiveControl, i)] = regexp;
+    int regexpResult = regexpIndex(regexp, "thisdoesntmatter");
+    if (regexpResult <= -2)
+    {
+        DebugTN("It seems that the given regular expression is wrong: "+regexp+"    the process will be aborted");
+        return -1;
+    }
+  }
+
+  string errMsg;
+  int errLine;
+  int errColumn;
+
+  string configFileToLoad = configFileName;
+
+  if (! _UNIX)
+  {
+    DebugTN("This code was validated only on Linux systems. For Windows, BE-ICS should perform the validation and release the component. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
+    return -1;
+  }
+
+  // try to perform entity substitution
+  string tempFile = configFileToLoad + ".temp";
+  int result = system("xmllint --noent " + configFileToLoad + " > " + tempFile);
+  DebugTN("The call to 'xmllint --noent' resulted in: "+result);
+  if (result != 0)
+  {
+    DebugTN("It was impossible to run xmllint to inflate entities. WinCC OA might load this file incorrectly if entity references are used. So we decided it wont be possible. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
+    return -1;
+  }
+  configFileToLoad = tempFile;
+
+  int docNum = xmlDocumentFromFile(configFileToLoad , errMsg, errLine, errColumn);
+  if (docNum < 0)
+  {
+    DebugN("Didn't open the file: at Line="+errLine+" Column="+errColumn+" Message=" + errMsg);
+    return -1;
+  }
+
+  int firstNode = xmlFirstChild(docNum);
+  if (firstNode < 0)
+  {
+    DebugN("Cant get the first child of the config file.");
+    return -1;
+  }
+  
+  while (xmlNodeName(docNum, firstNode) != "configuration")
+  {
+    firstNode = xmlNextSibling(docNum, firstNode);
+    if (firstNode < 0)
+    {
+      DebugTN("configuration node not found, sorry.");
+      return -1;
+    }
+  }
+
+  // now firstNode holds configuration node
+  dyn_int children;
+  {% set root = designInspector.objectify_root() %}
+  {% for ho in root.hasobjects %}
+    {% if ho.get('instantiateUsing') == 'configuration' %}
+      dyn_int children = {{functionPrefix}}getChildNodesWithName(docNum, firstNode, "{{ho.get('class')}}");
+      for (int i = 1; i<=dynlen(children); i++)
+      {
+        {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+      }
+    {% elif ho.get('instantiateUsing') == 'design' %}
+      {{debug("WARNING: Skipping objects instantiated by design. It's not yet supported by Cacophony.",
+         "Want to get it supported? Mail to quasar-developers@cern.ch")}}
+      {{debug("  ... previous warning is at Root, hasobjects to class: ", ho.get('class'))}}
+    {% else %}
+      {{debug("ERROR: unsupported mode.")}}
+    {% endif %}
+  {% endfor %}
+  
+  
+  return 0;
+}
