@@ -74,14 +74,14 @@ def main():
     print('Cacophony root is at: ' + cacophony_root)
     try:
         transformDesign(
-            xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
+            os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
             outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
             requiresMerge=False,
             astyleRun=True,
             additionalParam=additional_params)
 
         transformDesign(
-            xsltTransformation=os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
+            os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
             outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
             requiresMerge=False,
             astyleRun=True,
