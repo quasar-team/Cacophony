@@ -3,12 +3,50 @@
 import sys
 import os
 import argparse
+from colorama import Fore, Style
 
 thisModuleName = "Cacophony"
 
 sys.path.insert(0, 'FrameworkInternals')
 
 from transformDesign import transformDesign
+import quasar_basic_utils
+
+# we use template_debug to print out to keep uniform debug style with what comes out as debug
+# from the transform itself
+from transform_filters import template_debug
+
+ObviousMapping = {  # these are unanimously good choices
+    'OpcUa_Boolean' : "DPEL_BOOL",
+    'OpcUa_UInt32'  : "DPEL_UINT",
+    'OpcUa_Int32'   : "DPEL_INT",
+    'OpcUa_UInt64'  : "DPEL_ULONG",
+    'OpcUa_Int64'   : "DPEL_LONG",
+    'OpcUa_Float'   : "DPEL_FLOAT",
+    'OpcUa_Double'  : "DPEL_FLOAT",
+    'UaString'      : "DPEL_STRING",
+    'UaByteString'  : "DPEL_BLOB"
+    }
+
+LessObviousMapping = {
+    'OpcUa_Byte'    : 'DPEL_UINT',
+    'OpcUa_SByte'   : 'DPEL_INT',
+    'OpcUa_UInt16'  : 'DPEL_UINT',
+    'OpcUa_Int16'   : 'DPEL_INT'
+}
+
+
+def quasar_data_type_to_dpt_type_constant(quasar_data_type, cls, cv):
+    if quasar_data_type in ObviousMapping:
+        return ObviousMapping[quasar_data_type]
+    # for the remaining types, we have to do less obvious choices.
+    elif quasar_data_type in LessObviousMapping:
+        to = LessObviousMapping[quasar_data_type]
+        template_debug(("WARNING: mapped {0} to {1}, because of no corresponding type in WinCC OA. "
+                        "(at: class={2} cv={3})").format(quasar_data_type, to, cls, cv))
+        return to
+    else:
+        raise Exception("The following quasar datatype: '{0}' is not yet supported in Cacophony.".format(quasar_data_type))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -19,26 +57,36 @@ def main():
     parser.add_argument("--function_prefix", dest="function_prefix", default="")
     args = parser.parse_args()
 
-    additional_params = [
-        'typePrefix={0}'.format(args.dpt_prefix),
-        'serverName={0}'.format(args.server_name),
-        'driverNumber={0}'.format(args.driver_number),
-        'subscriptionName={0}'.format(args.subscription),
-        'functionPrefix={0}'.format(args.function_prefix)]
+    additional_params = {
+        'typePrefix'       : args.dpt_prefix,
+        'serverName'       : args.server_name,
+        'driverNumber'     : args.driver_number,
+        'subscriptionName' : args.subscription,
+        'functionPrefix'   : args.function_prefix}
+    
+    print(Fore.GREEN + "For your information, current settings are: \n" + Fore.BLUE
+        + '\n'.join([('  {0:20} : {1}'.format(k, additional_params[k])) for k in additional_params.keys()])
+        + Style.RESET_ALL)
+    
+    additional_params.update({'mapper' : quasar_data_type_to_dpt_type_constant})
 
-    transformDesign(
-        xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToDptCreation.xslt'),
-        outputFile=os.path.join(thisModuleName, 'generated', 'createDpts.ctl'),
-        requiresMerge=False,
-        astyleRun=True,
-        additionalParam=additional_params)
+    cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
+    print('Cacophony root is at: ' + cacophony_root)
+    try:
+        transformDesign(
+            os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
+            outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
+            requiresMerge=False,
+            astyleRun=True,
+            additionalParam=additional_params)
 
-    transformDesign(
-        xsltTransformation=os.path.join(thisModuleName, 'xslt', 'designToConfigParser.xslt'),
-        outputFile=os.path.join(thisModuleName, 'generated', 'configParser.ctl'),
-        requiresMerge=False,
-        astyleRun=True,
-        additionalParam=additional_params)
-
+        transformDesign(
+            os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
+            outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
+            requiresMerge=False,
+            astyleRun=True,
+            additionalParam=additional_params)
+    except:
+        quasar_basic_utils.quasaric_exception_handler()
 if __name__ == "__main__":
     main()
