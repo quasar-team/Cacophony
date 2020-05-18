@@ -1,0 +1,307 @@
+{# Author: Piotr Nikiel, <piotr@nikiel.info> #}
+{# Date: Feb 2019, original version in XSLT  #}
+{#       May 2020, rework to Jinja2          #}
+
+// generated using Cacophony, an optional module of quasar, see: https://github.com/quasar-team/Cacophony
+
+{% macro cache_variable_address_space_write_to_mode(aswrite) %}
+  {% if aswrite == 'forbidden' %}DPATTR_ADDR_MODE_INPUT_SPONT /* mode */
+  {%- else %} DPATTR_ADDR_MODE_IO_SPONT /* mode */
+  {%- endif %}
+{% endmacro %}
+
+{% macro source_variable_address_space_mode_to_mode (asread, aswrite) %}
+  {% if asread != 'forbidden' and aswrite != 'forbidden' %}DPATTR_ADDR_MODE_IO_SQUERY
+  {%- elif asread != 'forbidden' and aswrite == 'forbidden' %}DPATTR_ADDR_MODE_INPUT_SQUERY
+  {%- elif asread == 'forbidden' and aswrite != 'forbidden' %}DPATTR_ADDR_MODE_OUTPUT_SINGLE
+  {%- else %}
+    {{debug("ERROR: settings of this source-variable don't make much sense")}}
+  error('Don't know how to map this address because it support neither read nor write...');
+  {% endif %}
+{% endmacro %}
+
+const string CONNECTIONSETTING_KEY_DRIVER_NUMBER = "DRIVER_NUMBER";
+const string CONNECTIONSETTING_KEY_SERVER_NAME = "SERVER_NAME";
+const string CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME = "SUBSCRIPTION_NAME";
+
+bool {{functionPrefix}}addressConfigWrapper (
+  string  dpe,
+  string  address,
+  int     mode,
+  mapping connectionSettings,
+  bool active=true
+)
+{
+  string subscription = "";
+  if (mode != DPATTR_ADDR_MODE_IO_SQUERY && mode != DPATTR_ADDR_MODE_INPUT_SQUERY)
+  {
+    subscription = connectionSettings[CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME];
+  }
+  dyn_string dsExceptionInfo;
+  fwPeriphAddress_setOPCUA (
+    dpe /*dpe*/,
+    connectionSettings[CONNECTIONSETTING_KEY_SERVER_NAME],
+    connectionSettings[CONNECTIONSETTING_KEY_DRIVER_NUMBER],
+    "ns=2;s="+address,
+    subscription /* subscription*/,
+    1 /* kind */,
+    1 /* variant */,
+    750 /* datatype */,
+    mode,
+    "" /*poll group */,
+    dsExceptionInfo
+    );
+  if (dynlen(dsExceptionInfo)>0)
+    return false;
+  DebugTN("Setting active on dpe: "+dpe+" to "+active);
+  dpSetWait(dpe + ":_address.._active", active);
+
+  return true;
+}
+
+bool {{functionPrefix}}evaluateActive(
+  mapping addressActiveControl,
+  string className,
+  string varName,
+  string dpe)
+{
+  bool active = false;
+  if (mappingHasKey(addressActiveControl, className))
+  {
+    string regex = addressActiveControl[className];
+    int regexMatchResult = regexpIndex(regex, varName, makeMapping("caseSensitive", true));
+    DebugTN("The result of evaluating regex: '"+regex+"' with string: '"+varName+" was: "+regexMatchResult);
+    if (regexMatchResult>=0)
+      active = true;
+    else
+    {
+      active = false;
+      DebugN("Note: the address on dpe: "+dpe+" will be non-active because such instructions were passed in the addressActive mapping.");
+    }
+  }
+  else
+    active = true; // by default
+  return active;
+}
+
+{% for class_name in designInspector.get_names_of_all_classes() %}
+{% set cls = designInspector.objectify_class(class_name) %}
+
+bool {{functionPrefix}}configure{{class_name}} (
+  int     docNum,
+  int     childNode,
+  string  prefix,
+  bool    createDps,
+  bool    assignAddresses,
+  bool    continueOnError,
+  mapping addressActiveControl,
+	mapping connectionSettings)
+{
+  DebugTN("Configure.{{class_name}} called");
+  string name;
+  xmlGetElementAttribute(docNum, childNode, "name", name);
+  string fullName = prefix+name;
+  string dpt = "{{typePrefix}}{{class_name}}";
+
+  if (createDps)
+  {
+    DebugTN("Will create DP "+fullName);
+    int result = dpCreate(fullName, dpt);
+    if (result != 0)
+    {
+      DebugTN("dpCreate name='"+fullName+"' dpt='"+dpt+"' not successful or already existing");
+      if (!continueOnError)
+          throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
+    }
+  }
+
+  if (assignAddresses)
+  {
+    string dpe, address;
+    dyn_string dsExceptionInfo;
+    bool success;
+    bool active = false;
+
+    {% for cv in cls.cachevariable %}
+      dpe = fullName+".{{cv.get('name')}}";
+      address = dpe; // address can be generated from dpe after some mods ...
+      strreplace(address, "/", ".");
+
+      active = {{functionPrefix}}evaluateActive(
+        addressActiveControl,
+        "{{class_name}}",
+        "{{cv.get('name')}}",
+        dpe);
+
+      success = {{functionPrefix}}addressConfigWrapper(
+        dpe,
+        address,
+        {{cache_variable_address_space_write_to_mode(cv.get('addressSpaceWrite'))}},
+      	connectionSettings,
+        active);
+
+      if (!success)
+      {
+         DebugTN("Failed setting address "+address+"; will terminate now.");
+         return false;
+      }
+    {% endfor %}
+
+    {% for sv in cls.sourcevariable %}
+      dpe = fullName+".{{sv.get('name')}}";
+      address = dpe; // address can be generated from dpe after some mods ...
+      strreplace(address, "/", ".");
+
+      active = {{functionPrefix}}evaluateActive(
+        addressActiveControl,
+        "{{class_name}}",
+        "{{sv.get('name')}}",
+        dpe);
+
+      success = {{functionPrefix}}addressConfigWrapper(
+        dpe,
+        address,
+        {{source_variable_address_space_mode_to_mode(sv.get('addressSpaceRead'), sv.get('addressSpaceWrite'))}} /* mode */,
+      	connectionSettings,
+        active);
+
+      if (!success)
+      {
+         DebugTN("Failed setting address "+address+"; will terminate now.");
+         return false;
+      }
+    {% endfor %}
+
+  }
+
+  dyn_int children;
+  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
+    children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
+    for (int i=1; i<=dynlen(children); i++)
+    {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+  {% endfor %}
+
+}
+
+{% endfor %}
+
+dyn_int {{functionPrefix}}getChildNodesWithName (int docNum, int parentNode, string name)
+{
+    dyn_int result;
+    int node = xmlFirstChild(docNum, parentNode);
+    while (node >= 0)
+    {
+        if (xmlNodeName(docNum, node)==name)
+            dynAppend(result, node);
+        node = xmlNextSibling (docNum, node);
+    }
+    return result;
+}
+
+int {{functionPrefix}}parseConfig (
+    string  configFileName,
+    bool    createDps,
+    bool    assignAddresses,
+    bool    continueOnError,
+    mapping addressActiveControl = makeMapping(),
+    mapping connectionSettings = makeMapping())
+/* Create instances */
+{
+
+  /* Apply defaults in connectionSettings, when not concretized by the user */
+  if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_DRIVER_NUMBER))
+  {
+    connectionSettings[CONNECTIONSETTING_KEY_DRIVER_NUMBER] = {{driverNumber}};
+  }
+  if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_SERVER_NAME))
+  {
+    connectionSettings[CONNECTIONSETTING_KEY_SERVER_NAME] = "{{serverName}}";
+  }
+  if (!mappingHasKey(connectionSettings, CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME))
+  {
+    connectionSettings[CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME] = "{{subscriptionName}}";
+  }
+
+  /* Pre/Suffix the expression with ^$ to enable exact matches and also check if given patterns make sense */
+  for (int i=1; i<=mappinglen(addressActiveControl); i++)
+  {
+    string regexp = mappingGetValue(addressActiveControl, i);
+    regexp = "^"+regexp+"$";
+    addressActiveControl[mappingGetKey(addressActiveControl, i)] = regexp;
+    int regexpResult = regexpIndex(regexp, "thisdoesntmatter");
+    if (regexpResult <= -2)
+    {
+        DebugTN("It seems that the given regular expression is wrong: "+regexp+"    the process will be aborted");
+        return -1;
+    }
+  }
+
+  string errMsg;
+  int errLine;
+  int errColumn;
+
+  string configFileToLoad = configFileName;
+
+  if (! _UNIX)
+  {
+    DebugTN("This code was validated only on Linux systems. For Windows, BE-ICS should perform the validation and release the component. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
+    return -1;
+  }
+
+  // try to perform entity substitution
+  string tempFile = configFileToLoad + ".temp";
+  int result = system("xmllint --noent " + configFileToLoad + " > " + tempFile);
+  DebugTN("The call to 'xmllint --noent' resulted in: "+result);
+  if (result != 0)
+  {
+    DebugTN("It was impossible to run xmllint to inflate entities. WinCC OA might load this file incorrectly if entity references are used. So we decided it wont be possible. See at https://its.cern.ch/jira/browse/OPCUA-1519 for more information.");
+    return -1;
+  }
+  configFileToLoad = tempFile;
+
+  int docNum = xmlDocumentFromFile(configFileToLoad , errMsg, errLine, errColumn);
+  if (docNum < 0)
+  {
+    DebugN("Didn't open the file: at Line="+errLine+" Column="+errColumn+" Message=" + errMsg);
+    return -1;
+  }
+
+  int firstNode = xmlFirstChild(docNum);
+  if (firstNode < 0)
+  {
+    DebugN("Cant get the first child of the config file.");
+    return -1;
+  }
+  
+  while (xmlNodeName(docNum, firstNode) != "configuration")
+  {
+    firstNode = xmlNextSibling(docNum, firstNode);
+    if (firstNode < 0)
+    {
+      DebugTN("configuration node not found, sorry.");
+      return -1;
+    }
+  }
+
+  // now firstNode holds configuration node
+  dyn_int children;
+  {% set root = designInspector.objectify_root() %}
+  {% for ho in root.hasobjects %}
+    {% if ho.get('instantiateUsing') == 'configuration' %}
+      dyn_int children = {{functionPrefix}}getChildNodesWithName(docNum, firstNode, "{{ho.get('class')}}");
+      for (int i = 1; i<=dynlen(children); i++)
+      {
+        {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+      }
+    {% elif ho.get('instantiateUsing') == 'design' %}
+      {{debug("WARNING: Skipping objects instantiated by design. It's not yet supported by Cacophony.",
+         "Want to get it supported? Mail to quasar-developers@cern.ch")}}
+      {{debug("  ... previous warning is at Root, hasobjects to class: ", ho.get('class'))}}
+    {% else %}
+      {{debug("ERROR: unsupported mode.")}}
+    {% endif %}
+  {% endfor %}
+  
+  
+  return 0;
+}
