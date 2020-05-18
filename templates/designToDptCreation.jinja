@@ -3,6 +3,7 @@
 {% for class_name in designInspector.get_names_of_all_classes() %}
 {% set cls = designInspector.objectify_class(class_name) %}
 
+//{{cls.get('name')}}
 bool {{functionPrefix}}createDpt{{cls.get('name')}}()
 {
   // the names of vars and the way of generating DPT come directly from examples of dpTypeCreate
