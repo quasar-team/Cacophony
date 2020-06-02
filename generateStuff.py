@@ -10,6 +10,8 @@ thisModuleName = "Cacophony"
 sys.path.insert(0, 'FrameworkInternals')
 
 from transformDesign import transformDesign
+from DesignInspector import DesignInspector
+from quasarExceptions import DesignFlaw
 import quasar_basic_utils
 
 # we use template_debug to print out to keep uniform debug style with what comes out as debug
@@ -35,6 +37,23 @@ LessObviousMapping = {
     'OpcUa_Int16'   : 'DPEL_INT'
 }
 
+def handle_float_variables():
+    design_inspector = DesignInspector(os.path.sep.join(['Design', 'Design.xml']))
+    float_variables = []
+    for class_name in design_inspector.get_names_of_all_classes():
+        cvs = design_inspector.objectify_cache_variables(class_name,
+            "[@dataType='OpcUa_Float' and @addressSpaceWrite != 'forbidden' and not(d:array)]")
+        float_variables += ['{0}/{1}(cache-var)'.format(class_name, cv.get('name')) for cv in cvs]
+        svs = design_inspector.objectify_source_variables(class_name,
+            "[@dataType='OpcUa_Float' and @addressSpaceWrite != 'forbidden' and not(d:array)]")
+        float_variables += ['{0}/{1}(source-var)'.format(class_name, sv.get('name')) for sv in svs]
+    if len(float_variables) > 0:
+        raise Exception(("In your design, there is/are scalar variables of "
+                         "type OpcUa_Float. This data-type has no direct correspondence in "
+                         "WinCC OA and will cause problems especially when writing from WinCC "
+                         "OA. Please convert these variables to OpcUa_Double data-type. "
+                         "List of variables (incl class names): \n{0}").format(
+                         '\n'.join(float_variables)))
 
 def quasar_data_type_to_dpt_type_constant(quasar_data_type, cls, cv):
     if quasar_data_type in ObviousMapping:
@@ -73,6 +92,7 @@ def main():
     cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
     print('Cacophony root is at: ' + cacophony_root)
     try:
+        handle_float_variables()
         transformDesign(
             os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
             outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
