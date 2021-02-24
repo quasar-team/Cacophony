@@ -171,6 +171,31 @@ bool {{functionPrefix}}configure{{class_name}} (
          return false;
       }
     {% endfor %}
+    {% for ce in cls.configentry %}
+      dpe = fullName+".{{ce.get('name')}}";
+      address = dpe; // address can be generated from dpe after some mods ...
+      strreplace(address, "/", ".");
+
+      active = {{functionPrefix}}evaluateActive(
+        addressActiveControl,
+        "{{class_name}}",
+        "{{ce.get('name')}}",
+        dpe);
+
+      success = {{functionPrefix}}addressConfigWrapper(
+        dpe,
+        address,
+        DPATTR_ADDR_MODE_INPUT_SPONT /* mode */,
+        connectionSettings,
+        active);
+
+      if (!success)
+      {
+         DebugTN("Failed setting address "+address+"; will terminate now.");
+         return false;
+      }
+
+    {% endfor %}
 
   }
 
@@ -272,7 +297,7 @@ int {{functionPrefix}}parseConfig (
     DebugN("Cant get the first child of the config file.");
     return -1;
   }
-  
+
   while (xmlNodeName(docNum, firstNode) != "configuration")
   {
     firstNode = xmlNextSibling(docNum, firstNode);
@@ -301,7 +326,7 @@ int {{functionPrefix}}parseConfig (
       {{debug("ERROR: unsupported mode.")}}
     {% endif %}
   {% endfor %}
-  
-  
+
+
   return 0;
 }
