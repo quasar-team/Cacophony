@@ -24,6 +24,12 @@ const string CONNECTIONSETTING_KEY_DRIVER_NUMBER = "DRIVER_NUMBER";
 const string CONNECTIONSETTING_KEY_SERVER_NAME = "SERVER_NAME";
 const string CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME = "SUBSCRIPTION_NAME";
 
+bool {{functionPrefix}}dpTypeExists(string dpt)
+{
+  dyn_string queriedTypes = dpTypes(dpt);
+  return (dynlen(queriedTypes) >= 1);
+}
+
 bool {{functionPrefix}}addressConfigWrapper (
   string  dpe,
   string  address,
@@ -272,7 +278,7 @@ int {{functionPrefix}}parseConfig (
     DebugN("Cant get the first child of the config file.");
     return -1;
   }
-  
+
   while (xmlNodeName(docNum, firstNode) != "configuration")
   {
     firstNode = xmlNextSibling(docNum, firstNode);
@@ -301,7 +307,7 @@ int {{functionPrefix}}parseConfig (
       {{debug("ERROR: unsupported mode.")}}
     {% endif %}
   {% endfor %}
-  
-  
+
+
   return 0;
 }
