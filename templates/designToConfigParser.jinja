@@ -109,75 +109,80 @@ bool {{functionPrefix}}configure{{class_name}} (
   string fullName = prefix+name;
   string dpt = "{{typePrefix}}{{class_name}}";
 
-  if (createDps)
+  if ({{functionPrefix}}dpTypeExists(dpt))
   {
-    DebugTN("Will create DP "+fullName);
-    int result = dpCreate(fullName, dpt);
-    if (result != 0)
+
+    if (createDps)
     {
-      DebugTN("dpCreate name='"+fullName+"' dpt='"+dpt+"' not successful or already existing");
-      if (!continueOnError)
-          throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
+
+      DebugTN("Will create DP "+fullName);
+      int result = dpCreate(fullName, dpt);
+      if (result != 0)
+      {
+        DebugTN("dpCreate name='"+fullName+"' dpt='"+dpt+"' not successful or already existing");
+        if (!continueOnError)
+            throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
+      }
     }
-  }
 
-  if (assignAddresses)
-  {
-    string dpe, address;
-    dyn_string dsExceptionInfo;
-    bool success;
-    bool active = false;
+    if (assignAddresses)
+    {
+      string dpe, address;
+      dyn_string dsExceptionInfo;
+      bool success;
+      bool active = false;
 
-    {% for cv in cls.cachevariable %}
-      dpe = fullName+".{{cv.get('name')}}";
-      address = dpe; // address can be generated from dpe after some mods ...
-      strreplace(address, "/", ".");
+      {% for cv in cls.cachevariable %}
+        dpe = fullName+".{{cv.get('name')}}";
+        address = dpe; // address can be generated from dpe after some mods ...
+        strreplace(address, "/", ".");
 
-      active = {{functionPrefix}}evaluateActive(
-        addressActiveControl,
-        "{{class_name}}",
-        "{{cv.get('name')}}",
-        dpe);
+        active = {{functionPrefix}}evaluateActive(
+          addressActiveControl,
+          "{{class_name}}",
+          "{{cv.get('name')}}",
+          dpe);
 
-      success = {{functionPrefix}}addressConfigWrapper(
-        dpe,
-        address,
-        {{cache_variable_address_space_write_to_mode(cv.get('addressSpaceWrite'))}},
-      	connectionSettings,
-        active);
+        success = {{functionPrefix}}addressConfigWrapper(
+          dpe,
+          address,
+          {{cache_variable_address_space_write_to_mode(cv.get('addressSpaceWrite'))}},
+        	connectionSettings,
+          active);
 
-      if (!success)
-      {
-         DebugTN("Failed setting address "+address+"; will terminate now.");
-         return false;
-      }
-    {% endfor %}
+        if (!success)
+        {
+           DebugTN("Failed setting address "+address+"; will terminate now.");
+           return false;
+        }
+      {% endfor %}
 
-    {% for sv in cls.sourcevariable %}
-      dpe = fullName+".{{sv.get('name')}}";
-      address = dpe; // address can be generated from dpe after some mods ...
-      strreplace(address, "/", ".");
+      {% for sv in cls.sourcevariable %}
+        dpe = fullName+".{{sv.get('name')}}";
+        address = dpe; // address can be generated from dpe after some mods ...
+        strreplace(address, "/", ".");
 
-      active = {{functionPrefix}}evaluateActive(
-        addressActiveControl,
-        "{{class_name}}",
-        "{{sv.get('name')}}",
-        dpe);
+        active = {{functionPrefix}}evaluateActive(
+          addressActiveControl,
+          "{{class_name}}",
+          "{{sv.get('name')}}",
+          dpe);
 
-      success = {{functionPrefix}}addressConfigWrapper(
-        dpe,
-        address,
-        {{source_variable_address_space_mode_to_mode(sv.get('addressSpaceRead'), sv.get('addressSpaceWrite'))}} /* mode */,
-      	connectionSettings,
-        active);
+        success = {{functionPrefix}}addressConfigWrapper(
+          dpe,
+          address,
+          {{source_variable_address_space_mode_to_mode(sv.get('addressSpaceRead'), sv.get('addressSpaceWrite'))}} /* mode */,
+        	connectionSettings,
+          active);
 
-      if (!success)
-      {
-         DebugTN("Failed setting address "+address+"; will terminate now.");
-         return false;
-      }
-    {% endfor %}
+        if (!success)
+        {
+           DebugTN("Failed setting address "+address+"; will terminate now.");
+           return false;
+        }
+      {% endfor %}
 
+    }
   }
 
   dyn_int children;
