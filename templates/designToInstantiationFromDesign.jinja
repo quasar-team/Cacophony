@@ -1,0 +1,180 @@
+{# Author: Piotr Nikiel, <piotr@nikiel.info> #}
+{# Date: 12 Aug 2021                         #}
+
+bool {{functionPrefix}}dpTypeExists(string dpt)
+{
+  dyn_string queriedTypes = dpTypes(dpt);
+  return (dynlen(queriedTypes) >= 1);
+}
+
+{% macro cache_variable_address_space_write_to_mode(aswrite) %}
+  {% if aswrite == 'forbidden' %}DPATTR_ADDR_MODE_INPUT_SPONT /* mode */
+  {%- else %} DPATTR_ADDR_MODE_IO_SPONT /* mode */
+  {%- endif %}
+{% endmacro %}
+
+{% macro source_variable_address_space_mode_to_mode (asread, aswrite) %}
+  {% if asread != 'forbidden' and aswrite != 'forbidden' %}DPATTR_ADDR_MODE_IO_SQUERY
+  {%- elif asread != 'forbidden' and aswrite == 'forbidden' %}DPATTR_ADDR_MODE_INPUT_SQUERY
+  {%- elif asread == 'forbidden' and aswrite != 'forbidden' %}DPATTR_ADDR_MODE_OUTPUT_SINGLE
+  {%- else %}
+    {{debug("ERROR: settings of this source-variable don't make much sense")}}
+  error('Don't know how to map this address because it support neither read nor write...');
+  {% endif %}
+{% endmacro %}
+
+bool {{functionPrefix}}addressConfigWrapper (
+  string  dpe,
+  string  address,
+  int     mode,
+  mapping connectionSettings,
+  bool active=true
+)
+{
+  string subscription = "";
+  if (mode != DPATTR_ADDR_MODE_IO_SQUERY && mode != DPATTR_ADDR_MODE_INPUT_SQUERY)
+  {
+    subscription = connectionSettings[CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME];
+  }
+  dyn_string dsExceptionInfo;
+  fwPeriphAddress_setOPCUA (
+    dpe /*dpe*/,
+    connectionSettings[CONNECTIONSETTING_KEY_SERVER_NAME],
+    connectionSettings[CONNECTIONSETTING_KEY_DRIVER_NUMBER],
+    "ns=2;s="+address,
+    subscription /* subscription*/,
+    1 /* kind */,
+    1 /* variant */,
+    750 /* datatype */,
+    mode,
+    "" /*poll group */,
+    dsExceptionInfo
+    );
+  if (dynlen(dsExceptionInfo)>0)
+    return false;
+  DebugTN("Setting active on dpe: "+dpe+" to "+active);
+  dpSetWait(dpe + ":_address.._active", active);
+
+  return true;
+}
+
+bool {{functionPrefix}}evaluateActive(
+  mapping addressActiveControl,
+  string className,
+  string varName,
+  string dpe)
+{
+  bool active = false;
+  if (mappingHasKey(addressActiveControl, className))
+  {
+    string regex = addressActiveControl[className];
+    int regexMatchResult = regexpIndex(regex, varName, makeMapping("caseSensitive", true));
+    DebugTN("The result of evaluating regex: '"+regex+"' with string: '"+varName+" was: "+regexMatchResult);
+    if (regexMatchResult>=0)
+      active = true;
+    else
+    {
+      active = false;
+      DebugN("Note: the address on dpe: "+dpe+" will be non-active because such instructions were passed in the addressActive mapping.");
+    }
+  }
+  else
+    active = true; // by default
+  return active;
+}
+
+int {{functionPrefix}}instantiateFromDesign(
+  bool createDps,
+  bool assignAddresses,
+  bool continueOnError,
+  mapping addressActiveControl = makeMapping(),
+  mapping connectionSettings = makeMapping())
+)
+{
+  {% set root = designInspector.objectify_root() %}
+  {% for ho in root.hasobjects %}
+    {% if ho.get('instantiateUsing') == 'design' %}
+      {% set cls = designInspector.objectify_class(ho.get('class')) %}
+      string dpt = "{{typePrefix}}{{ho.get('class')}}";
+      if ({{functionPrefix}}dpTypeExists(dpt))
+      {
+        {% for obj in ho.object %}
+
+          {{debug("instantiation code for", obj.get('name'))}}
+          string name = "{{obj.get('name')}}";
+          string fullName = prefix+name;
+          if (createDps)
+          {
+            DebugTN("Will create DP "+fullName);
+            int result = dpCreate(fullName, dpt);
+            if (result != 0)
+            {
+              DebugTN("dpCreate name='"+fullName+"' dpt='"+dpt+"' not successful or already existing");
+              if (!continueOnError)
+                  throw(makeError("Cacophony", PRIO_SEVERE, ERR_IMPL, 1, "XXX YYY ZZZ"));
+            }
+          }
+          if (assignAddresses)
+          {
+            string dpe, address;
+            dyn_string dsExceptionInfo;
+            bool success;
+            bool active = false;
+
+            {% for cv in cls.cachevariable %}
+              dpe = fullName+".{{cv.get('name')}}";
+              address = dpe; // address can be generated from dpe after some mods ...
+              strreplace(address, "/", ".");
+
+              active = {{functionPrefix}}evaluateActive(
+                addressActiveControl,
+                "{{class_name}}",
+                "{{cv.get('name')}}",
+                dpe);
+
+              success = {{functionPrefix}}addressConfigWrapper(
+                dpe,
+                address,
+                {{cache_variable_address_space_write_to_mode(cv.get('addressSpaceWrite'))}},
+                connectionSettings,
+                active);
+
+              if (!success)
+              {
+                 DebugTN("Failed setting address "+address+"; will terminate now.");
+                 return false;
+              }
+            {% endfor %}
+
+            {% for sv in cls.sourcevariable %}
+              dpe = fullName+".{{sv.get('name')}}";
+              address = dpe; // address can be generated from dpe after some mods ...
+              strreplace(address, "/", ".");
+
+              active = {{functionPrefix}}evaluateActive(
+                addressActiveControl,
+                "{{class_name}}",
+                "{{sv.get('name')}}",
+                dpe);
+
+              success = {{functionPrefix}}addressConfigWrapper(
+                dpe,
+                address,
+                {{source_variable_address_space_mode_to_mode(sv.get('addressSpaceRead'), sv.get('addressSpaceWrite'))}} /* mode */,
+                connectionSettings,
+                active);
+
+              if (!success)
+              {
+                 DebugTN("Failed setting address "+address+"; will terminate now.");
+                 return false;
+              }
+            {% endfor %}
+
+          }
+
+        {% endfor %}
+      }
+    {% endif %}
+  {% endfor %}
+}
