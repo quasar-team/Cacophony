@@ -305,8 +305,8 @@ int {{functionPrefix}}parseConfig (
         {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
       }
     {% elif ho.get('instantiateUsing') == 'design' %}
-      {{debug("WARNING: Skipping objects instantiated by design. It's not yet supported by Cacophony.",
-         "Want to get it supported? Mail to quasar-developers@cern.ch")}}
+      {{debug("WARNING: Skipping objects instantiated by design. For pure design instantiation ")}}
+      {{debug("please run instantiateFromDesign.ctl")}}
       {{debug("  ... previous warning is at Root, hasobjects to class: ", ho.get('class'))}}
     {% else %}
       {{debug("ERROR: unsupported mode.")}}

@@ -82,11 +82,11 @@ def main():
         'driverNumber'     : args.driver_number,
         'subscriptionName' : args.subscription,
         'functionPrefix'   : args.function_prefix}
-    
+
     print(Fore.GREEN + "For your information, current settings are: \n" + Fore.BLUE
         + '\n'.join([('  {0:20} : {1}'.format(k, additional_params[k])) for k in additional_params.keys()])
         + Style.RESET_ALL)
-    
+
     additional_params.update({'mapper' : quasar_data_type_to_dpt_type_constant})
 
     cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
@@ -103,6 +103,13 @@ def main():
         transformDesign(
             os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
             outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
+            requiresMerge=False,
+            astyleRun=True,
+            additionalParam=additional_params)
+
+        transformDesign(
+            os.path.join(cacophony_root, 'templates', 'designToInstantiationFromDesign.jinja'),
+            outputFile=os.path.join(cacophony_root, 'generated', 'instantiateFromDesign.ctl'),
             requiresMerge=False,
             astyleRun=True,
             additionalParam=additional_params)
