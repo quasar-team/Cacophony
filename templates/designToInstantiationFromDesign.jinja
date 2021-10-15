@@ -1,6 +1,10 @@
 {# Author: Piotr Nikiel, <piotr@nikiel.info> #}
 {# Date: 12 Aug 2021                         #}
 
+const string CONNECTIONSETTING_KEY_DRIVER_NUMBER = "DRIVER_NUMBER";
+const string CONNECTIONSETTING_KEY_SERVER_NAME = "SERVER_NAME";
+const string CONNECTIONSETTING_KEY_SUBSCRIPTION_NAME = "SUBSCRIPTION_NAME";
+
 bool {{functionPrefix}}dpTypeExists(string dpt)
 {
   dyn_string queriedTypes = dpTypes(dpt);
@@ -84,12 +88,12 @@ bool {{functionPrefix}}evaluateActive(
 }
 
 int {{functionPrefix}}instantiateFromDesign(
+  string prefix,
   bool createDps,
   bool assignAddresses,
   bool continueOnError,
   mapping addressActiveControl = makeMapping(),
   mapping connectionSettings = makeMapping())
-)
 {
   {% set root = designInspector.objectify_root() %}
   {% for ho in root.hasobjects %}
@@ -123,7 +127,7 @@ int {{functionPrefix}}instantiateFromDesign(
 
             {% for cv in cls.cachevariable %}
               dpe = fullName+".{{cv.get('name')}}";
-              address = dpe; // address can be generated from dpe after some mods ...
+              address = name+".{{cv.get('name')}}"; // address can be generated from dpe after some mods ...
               strreplace(address, "/", ".");
 
               active = {{functionPrefix}}evaluateActive(
