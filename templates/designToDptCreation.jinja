@@ -41,6 +41,7 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
   {% endif %}
 
   int status = dpTypeCreate(xxdepes, xxdepei);
+  DebugN("{{functionPrefix}}createDpt{{cls.get('name')}}: completed, dpTypeCreate returned status ["+status+"]");
   return status == 0;
 }
 {% endfor %}
@@ -51,8 +52,10 @@ int {{functionPrefix}}createDpts (string dptFilter=".*")
     {% set cls = designInspector.objectify_class(class_name) %}
     {
       int result = regexpIndex(dptFilter, "{{cls.get('name')}}");
+      DebugN("createDpts: processing class {{class_name}} regexpIndex returned ["+result+"]");
       if (result >= 0)
       {
+        DebugN("createDpts: creating DPT for class {{class_name}}");
         if (!{{functionPrefix}}createDpt{{cls.get('name')}}())
         return 1;
       }
