@@ -107,9 +107,11 @@ bool {{functionPrefix}}configure{{class_name}} (
   string name;
   if(xmlGetElementAttribute(docNum, childNode, "name", name) != 0)
   {
-    {% if designInspector.is_class_always_singleton(class_name, instantiated_by_filter='configuration') %}
-      DebugTN("Configure.{{class_name}} singleton instance configuration has no attribute [name], defaulting to class name [{{class_name}}]");
-      name = "{{class_name}}";
+    {% if designInspector.is_class_always_singleton(class_name, instantiated_by_filter='configuration')
+      and designInspector.get_class_default_instance_name(class_name) != None %}
+      {% set instance_name = designInspector.get_class_default_instance_name(class_name) %}
+      DebugTN("Configure.{{class_name}} singleton instance configuration has no attribute [name], defaulting to class name [{{instance_name}}]");
+      name = "{{instance_name}}";
     {% else %}
       DebugTN("Configure.{{class_name}} instance configuration has no attribute [name]: invalid configuration, returning FALSE");
       return false;
