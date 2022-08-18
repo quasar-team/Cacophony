@@ -105,7 +105,17 @@ bool {{functionPrefix}}configure{{class_name}} (
 {
   DebugTN("Configure.{{class_name}} called");
   string name;
-  xmlGetElementAttribute(docNum, childNode, "name", name);
+  if(xmlGetElementAttribute(docNum, childNode, "name", name) != 0)
+  {
+    {% if designInspector.is_class_always_singleton(class_name, instantiated_by_filter='configuration') %}
+      DebugTN("Configure.{{class_name}} singleton instance configuration has no attribute [name], defaulting to class name [{{class_name}}]");
+      name = "{{class_name}}";
+    {% else %}
+      DebugTN("Configure.{{class_name}} instance configuration has no attribute [name]: invalid configuration, returning FALSE");
+      return false;
+    {% endif %}
+  }
+
   string fullName = prefix+name;
   string dpt = "{{typePrefix}}{{class_name}}";
 
