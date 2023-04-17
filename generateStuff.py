@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # @author Piotr Nikiel <piotr.nikiel@gmail.com>
 
 import sys
