@@ -1,4 +1,5 @@
 {# Author: Piotr Nikiel, <piotr@nikiel.info> #}
+{# Author: Paris Moschovakos, <paris.moschovakos@cern.ch> #}
 {# Date: Feb 2019, original version in XSLT  #}
 {#       May 2020, rework to Jinja2          #}
 
@@ -11,7 +12,7 @@
 //{{cls.get('name')}}
 bool {{functionPrefix}}createDpt{{cls.get('name')}}()
 {
-  // the names of vars and the way of generating DPT come directly from examples of dpTypeCreate
+  // the names of vars and the way of generating DPT come directly from examples of dpTypeChange
   dyn_dyn_string xxdepes;
   dyn_dyn_int xxdepei;
   dynAppend(xxdepes, makeDynString("{{typePrefix}}{{cls.get('name')}}", ""));
@@ -40,8 +41,8 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
     {{debug("WARNING: Class has method(s) but there is no method support in WinCC OA, skipping! (at class:", class_name, ")")}}
   {% endif %}
 
-  int status = dpTypeCreate(xxdepes, xxdepei);
-  DebugN("{{functionPrefix}}createDpt{{cls.get('name')}}: completed, dpTypeCreate returned status ["+status+"]");
+  int status = dpTypeChange(xxdepes, xxdepei);
+  DebugN("{{functionPrefix}}createDpt{{cls.get('name')}}: completed, dpTypeChange returned status ["+status+"]");
   return status == 0;
 }
 {% endfor %}
