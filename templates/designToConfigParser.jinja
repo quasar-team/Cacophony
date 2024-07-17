@@ -124,7 +124,6 @@ bool {{functionPrefix}}configureFromXML{{class_name}} (
   dyn_int children;
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
   {# {% for ho in designInspector.objectify_has_objects(class_name, "") %} #}
-    {{debug(ho.get('class'), ho.get('name'))}}
     children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
     for (int i=1; i<=dynlen(children); i++)
     {{functionPrefix}}configureFromXML{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
@@ -225,10 +224,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   // Parse children instantiated from design
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='design']")%}
     {% for obj in ho.object %}
-      {{debug(obj.get('name'))}}
       {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
     {% endfor %}
-    {{debug(ho.get('class'), ho.get('name'), 'needs to be generated from design')}}
   {% endfor %}
 }
 
