@@ -132,7 +132,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   string  dpeNamePrefix="")
 {
   DebugTN("Configure.{{class_name}} called without XML");
-  string fullName = prefix+name;
+  string fullAddressName = prefix+name;
+  string fullName = dpeNamePrefix + fullAddressName;
   string dpt = "{{typePrefix}}{{class_name}}";
 
   if ({{functionPrefix}}dpTypeExists(dpt))
@@ -160,9 +161,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
 
       {% for cv in cls.cachevariable %}
         dpe = fullName+".{{cv.get('name')}}";
-        address = dpe; // address can be generated from dpe after some mods ...
+        address = fullAddressName+".{{cv.get('name')}}"; // address can be generated from dpe after some mods ...
         strreplace(address, "/", ".");
-        dpe = dpeNamePrefix + dpe; // prefix the dpe name if requested
 
         active = {{functionPrefix}}evaluateActive(
           addressActiveControl,
@@ -187,9 +187,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
 
       {% for sv in cls.sourcevariable %}
         dpe = fullName+".{{sv.get('name')}}";
-        address = dpe; // address can be generated from dpe after some mods ...
+        address = fullAddressName+".{{sv.get('name')}}"; // address can be generated from dpe after some mods ...
         strreplace(address, "/", ".");
-        dpe = dpeNamePrefix + dpe; // prefix the dpe name if requested
 
         active = {{functionPrefix}}evaluateActive(
           addressActiveControl,
