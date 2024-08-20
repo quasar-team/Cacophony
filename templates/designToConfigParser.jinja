@@ -136,6 +136,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   string fullName = dpeNamePrefix + fullAddressName;
   string dpt = "{{typePrefix}}{{class_name}}";
 
+  bool success = true;
+
   if ({{functionPrefix}}dpTypeExists(dpt))
   {
 
@@ -156,7 +158,6 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
     {
       string dpe, address;
       dyn_string dsExceptionInfo;
-      bool success;
       bool active = false;
 
       {% for cv in cls.cachevariable %}
@@ -219,6 +220,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
       {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings, dpeNamePrefix);
     {% endfor %}
   {% endfor %}
+
+  return success;
 }
 
 {% endfor %}
