@@ -6,6 +6,22 @@
 
 // generated using Cacophony, an optional module of quasar, see: https://github.com/quasar-team/Cacophony
 
+//Calculated Variable
+bool createDptCalculatedVariable()
+{
+    // the names of vars and the way of generating DPT come directly from examples of dpTypeChange
+    dyn_dyn_string xxdepes;
+    dyn_dyn_int xxdepei;
+    dynAppend(xxdepes, makeDynString("{{typePrefix}}CalculatedVariable", ""));
+    dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
+    dynAppend(xxdepes, makeDynString("", "value"));
+    dynAppend(xxdepei, makeDynInt(0, DPEL_FLOAT));
+
+    int status = dpTypeChange(xxdepes, xxdepei);
+    DebugN("createCalculatedVariable: completed, dpTypeChange returned status ["+status+"]");
+    return status == 0;
+}
+
 {% for class_name in designInspector.get_names_of_all_classes() %}
 {% set cls = designInspector.objectify_class(class_name) %}
 
@@ -19,8 +35,8 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
   dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
   {% for cv in cls.cachevariable %}
     {% if cv.array|length>0 %}
-      {{debug("WARNING: Skipping array cache-variable. There is no support for arrays in Cacophony yet.",
-         "You can request it from Piotr. (at class:", class_name, " cache-variable: ", cv.get('name'))}}
+      dynAppend(xxdepes, makeDynString("", "{{cv.get('name')}}"));
+      dynAppend(xxdepei, makeDynInt(0, {{mapper(cv.get('dataType'), class_name, cv.get('name'), False)}})); 
     {% else %} {# scalar #}
       dynAppend(xxdepes, makeDynString("", "{{cv.get('name')}}"));
       dynAppend(xxdepei, makeDynInt(0, {{mapper(cv.get('dataType'), class_name, cv.get('name'))}})); 
@@ -29,11 +45,11 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
   
   {% for sv in cls.sourcevariable %}
     {% if sv.array|length>0 %}
-      {{debug("WARNING: Skipping array source-variable. There is no support for arrays in Cacophony yet. ",
+      {{debug("WARNING: Skipping array source-variable. There is no support for source variable arrays in Cacophony yet.",
          "You can request it from Piotr.")}}
     {% else %} {# scalar #}
       dynAppend(xxdepes, makeDynString("", "{{sv.get('name')}}"));
-      dynAppend(xxdepei, makeDynInt(0, {{mapper(sv.get('dataType'), class_name, sv.get('name'))}}));
+      dynAppend(xxdepei, makeDynInt(0, {{mapper(sv.get('dataType'), class_name, sv.get('name'), False)}}));
     {% endif %}
   {% endfor %}
   
@@ -49,6 +65,20 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
 
 int {{functionPrefix}}createDpts (string dptFilter=".*")
 {
+    {
+      int result = regexpIndex(dptFilter, "CalculatedVariable");
+      DebugN("createDpts: processing class CalculatedVariable regexpIndex returned ["+result+"]");
+      if (result >= 0)
+      {
+          DebugN("createDpts: creating DPT for class CalculatedVariable");
+          if (!createDptCalculatedVariable())
+              return 1;
+      }
+      else
+      {
+          DebugN("DPT CalculatedVariable not covered by provided dptFilter, skipping");
+      }
+    }
   {% for class_name in designInspector.get_names_of_all_classes() %}
     {% set cls = designInspector.objectify_class(class_name) %}
     {

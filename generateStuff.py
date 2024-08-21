@@ -39,6 +39,25 @@ LessObviousMapping = {
     'OpcUa_Int16'   : 'DPEL_INT'
 }
 
+ObviousMappingArray = {  # these are unanimously good choices
+    'OpcUa_Boolean' : "DPEL_DYN_BOOL",
+    'OpcUa_UInt32'  : "DPEL_DYN_UINT",
+    'OpcUa_Int32'   : "DPEL_DYN_INT",
+    'OpcUa_UInt64'  : "DPEL_DYN_ULONG",
+    'OpcUa_Int64'   : "DPEL_DYN_LONG",
+    'OpcUa_Float'   : "DPEL_DYN_FLOAT",
+    'OpcUa_Double'  : "DPEL_DYN_FLOAT",
+    'UaString'      : "DPEL_DYN_STRING",
+    'UaByteString'  : "DPEL_DYN_BLOB"
+    }
+
+LessObviousMappingArray = {
+    'OpcUa_Byte'    : 'DPEL_DYN_UINT',
+    'OpcUa_SByte'   : 'DPE_DYNL_INT',
+    'OpcUa_UInt16'  : 'DPEL_DYN_UINT',
+    'OpcUa_Int16'   : 'DPEL_DYN_INT'
+}
+
 def handle_float_variables():
     design_inspector = DesignInspector(os.path.sep.join(['Design', 'Design.xml']))
     float_variables = []
@@ -57,17 +76,29 @@ def handle_float_variables():
                          "List of variables (incl class names): \n{0}").format(
                          '\n'.join(float_variables)))
 
-def quasar_data_type_to_dpt_type_constant(quasar_data_type, cls, cv):
-    if quasar_data_type in ObviousMapping:
-        return ObviousMapping[quasar_data_type]
-    # for the remaining types, we have to do less obvious choices.
-    elif quasar_data_type in LessObviousMapping:
-        to = LessObviousMapping[quasar_data_type]
-        template_debug(("WARNING: mapped {0} to {1}, because of no corresponding type in WinCC OA. "
-                        "(at: class={2} cv={3})").format(quasar_data_type, to, cls, cv))
-        return to
-    else:
-        raise Exception("The following quasar datatype: '{0}' is not yet supported in Cacophony.".format(quasar_data_type))
+def quasar_data_type_to_dpt_type_constant(quasar_data_type, cls, cv, noarray = True):
+    if(noarray) :
+        if quasar_data_type in ObviousMapping:
+            return ObviousMapping[quasar_data_type]
+        # for the remaining types, we have to do less obvious choices.
+        elif quasar_data_type in LessObviousMapping:
+            to = LessObviousMapping[quasar_data_type]
+            template_debug(("WARNING: mapped {0} to {1}, because of no corresponding type in WinCC OA. "
+                            "(at: class={2} cv={3})").format(quasar_data_type, to, cls, cv))
+            return to
+        else:
+            raise Exception("The following quasar datatype: '{0}' is not yet supported in Cacophony.".format(quasar_data_type))
+    else :
+        if quasar_data_type in ObviousMapping:
+            return ObviousMappingArray[quasar_data_type]
+        # for the remaining types, we have to do less obvious choices.
+        elif quasar_data_type in LessObviousMapping:
+            to = LessObviousMappingArray[quasar_data_type]
+            template_debug(("WARNING: mapped {0} to {1}, because of no corresponding type in WinCC OA. "
+                            "(at: class={2} cv={3})").format(quasar_data_type, to, cls, cv))
+            return to
+        else:
+            raise Exception("The following quasar datatype: '{0}' is not yet supported in Cacophony.".format(quasar_data_type))
 
 def main():
     parser = argparse.ArgumentParser()
