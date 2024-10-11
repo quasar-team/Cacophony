@@ -103,7 +103,7 @@ bool {{functionPrefix}}configure{{class_name}} (
   mapping addressActiveControl,
 	mapping connectionSettings)
 {
-  DebugTN("Configure.{{class_name}} called from XML");
+  DebugTN("Configure.{{class_name}} called");
   string name;
   if(xmlGetElementAttribute(docNum, childNode, "name", name) != 0)
   {
@@ -123,7 +123,6 @@ bool {{functionPrefix}}configure{{class_name}} (
 
   dyn_int children;
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
-  {# {% for ho in designInspector.objectify_has_objects(class_name, "") %} #}
     children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
     for (int i=1; i<=dynlen(children); i++)
     {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
