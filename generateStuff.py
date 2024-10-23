@@ -53,7 +53,7 @@ ObviousMappingArray = {  # these are unanimously good choices
 
 LessObviousMappingArray = {
     'OpcUa_Byte'    : 'DPEL_DYN_UINT',
-    'OpcUa_SByte'   : 'DPE_DYNL_INT',
+    'OpcUa_SByte'   : 'DPEL_DYN_INT',
     'OpcUa_UInt16'  : 'DPEL_DYN_UINT',
     'OpcUa_Int16'   : 'DPEL_DYN_INT'
 }

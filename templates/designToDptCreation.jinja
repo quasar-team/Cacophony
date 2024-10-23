@@ -33,7 +33,7 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
          "You can request it from Piotr.")}}
     {% else %} {# scalar #}
       dynAppend(xxdepes, makeDynString("", "{{sv.get('name')}}"));
-      dynAppend(xxdepei, makeDynInt(0, {{mapper(sv.get('dataType'), class_name, sv.get('name'), False)}}));
+      dynAppend(xxdepei, makeDynInt(0, {{mapper(sv.get('dataType'), class_name, sv.get('name'))}}));
     {% endif %}
   {% endfor %}
   
