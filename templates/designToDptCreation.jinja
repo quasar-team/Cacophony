@@ -19,8 +19,8 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
   dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
   {% for cv in cls.cachevariable %}
     {% if cv.array|length>0 %}
-      {{debug("WARNING: Skipping array cache-variable. There is no support for arrays in Cacophony yet.",
-         "You can request it from Piotr. (at class:", class_name, " cache-variable: ", cv.get('name'))}}
+      dynAppend(xxdepes, makeDynString("", "{{cv.get('name')}}"));
+      dynAppend(xxdepei, makeDynInt(0, {{mapper(cv.get('dataType'), class_name, cv.get('name'), False)}})); 
     {% else %} {# scalar #}
       dynAppend(xxdepes, makeDynString("", "{{cv.get('name')}}"));
       dynAppend(xxdepei, makeDynInt(0, {{mapper(cv.get('dataType'), class_name, cv.get('name'))}})); 
@@ -29,7 +29,7 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
   
   {% for sv in cls.sourcevariable %}
     {% if sv.array|length>0 %}
-      {{debug("WARNING: Skipping array source-variable. There is no support for arrays in Cacophony yet. ",
+      {{debug("WARNING: Skipping array source-variable. There is no support for source variable arrays in Cacophony yet.",
          "You can request it from Piotr.")}}
     {% else %} {# scalar #}
       dynAppend(xxdepes, makeDynString("", "{{sv.get('name')}}"));
