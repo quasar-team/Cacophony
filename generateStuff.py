@@ -124,10 +124,12 @@ def main():
 
     cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
     print('Cacophony root is at: ' + cacophony_root)
+    design_xml_path: str = os.path.join(os.getcwd(), 'Design', 'Design.xml')
     try:
         handle_float_variables()
         transformDesign(
             os.path.join(cacophony_root, 'templates', 'designToDptCreation.jinja'),
+            designXmlPath=design_xml_path,
             outputFile=os.path.join(cacophony_root, 'generated', 'createDpts.ctl'),
             requiresMerge=False,
             astyleRun=True,
@@ -135,6 +137,7 @@ def main():
 
         transformDesign(
             os.path.join(cacophony_root, 'templates', 'designToConfigParser.jinja'),
+            designXmlPath=design_xml_path,
             outputFile=os.path.join(cacophony_root, 'generated', 'configParser.ctl'),
             requiresMerge=False,
             astyleRun=True,
@@ -142,6 +145,7 @@ def main():
 
         transformDesign(
             os.path.join(cacophony_root, 'templates', 'designToInstantiationFromDesign.jinja'),
+            designXmlPath=design_xml_path,
             outputFile=os.path.join(cacophony_root, 'generated', 'instantiateFromDesign.ctl'),
             requiresMerge=False,
             astyleRun=True,
