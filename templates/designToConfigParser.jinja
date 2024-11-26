@@ -93,7 +93,7 @@ bool {{functionPrefix}}evaluateActive(
 {% for class_name in designInspector.get_names_of_all_classes() %}
 {% set cls = designInspector.objectify_class(class_name) %}
 
-bool {{functionPrefix}}configure{{class_name}} (
+bool {{functionPrefix}}configureFromXML{{class_name}} (
   int     docNum,
   int     childNode,
   string  prefix,
@@ -101,9 +101,10 @@ bool {{functionPrefix}}configure{{class_name}} (
   bool    assignAddresses,
   bool    continueOnError,
   mapping addressActiveControl,
-	mapping connectionSettings)
+	mapping connectionSettings,
+  string  dpeNamePrefix="")
 {
-  DebugTN("Configure.{{class_name}} called");
+  DebugTN("Configure.{{class_name}} called from XML");
   string name;
   if(xmlGetElementAttribute(docNum, childNode, "name", name) != 0)
   {
@@ -119,7 +120,35 @@ bool {{functionPrefix}}configure{{class_name}} (
   }
 
   string fullName = prefix+name;
+  bool success = {{functionPrefix}}configureFromName{{class_name}}(name, prefix, createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings, dpeNamePrefix);
+
+  dyn_int children;
+  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
+  {# {% for ho in designInspector.objectify_has_objects(class_name, "") %} #}
+    children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
+    for (int i=1; i<=dynlen(children); i++)
+    {{functionPrefix}}configureFromXML{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings, dpeNamePrefix);
+  {% endfor %}
+
+  return success;
+}
+
+bool {{functionPrefix}}configureFromName{{class_name}} (
+  string  name,
+  string  prefix,
+  bool    createDps,
+  bool    assignAddresses,
+  bool    continueOnError,
+  mapping addressActiveControl,
+	mapping connectionSettings,
+  string  dpeNamePrefix="")
+{
+  DebugTN("Configure.{{class_name}} called without XML");
+  string fullAddressName = prefix+name;
+  string fullName = dpeNamePrefix + fullAddressName;
   string dpt = "{{typePrefix}}{{class_name}}";
+
+  bool success = true;
 
   if ({{functionPrefix}}dpTypeExists(dpt))
   {
@@ -141,37 +170,37 @@ bool {{functionPrefix}}configure{{class_name}} (
     {
       string dpe, address;
       dyn_string dsExceptionInfo;
-      bool success;
       bool active = false;
 
       {% for cv in cls.cachevariable %}
         dpe = fullName+".{{cv.get('name')}}";
-        address = dpe; // address can be generated from dpe after some mods ...
+        address = fullAddressName+".{{cv.get('name')}}"; // address can be generated from dpe after some mods ...
         strreplace(address, "/", ".");
 
         active = {{functionPrefix}}evaluateActive(
           addressActiveControl,
           "{{class_name}}",
           "{{cv.get('name')}}",
-          dpe);
-
+          dpe
+        );
         success = {{functionPrefix}}addressConfigWrapper(
           dpe,
           address,
           {{cache_variable_address_space_write_to_mode(cv.get('addressSpaceWrite'))}},
         	connectionSettings,
-          active);
-
+          active
+        );
         if (!success)
         {
            DebugTN("Failed setting address "+address+"; will terminate now.");
            return false;
         }
+
       {% endfor %}
 
       {% for sv in cls.sourcevariable %}
         dpe = fullName+".{{sv.get('name')}}";
-        address = dpe; // address can be generated from dpe after some mods ...
+        address = fullAddressName+".{{sv.get('name')}}"; // address can be generated from dpe after some mods ...
         strreplace(address, "/", ".");
 
         active = {{functionPrefix}}evaluateActive(
@@ -197,13 +226,14 @@ bool {{functionPrefix}}configure{{class_name}} (
     }
   }
 
-  dyn_int children;
-  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
-    children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
-    for (int i=1; i<=dynlen(children); i++)
-    {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+  // Parse children instantiated from design
+  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='design']")%}
+    {% for obj in ho.object %}
+      {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings, dpeNamePrefix);
+    {% endfor %}
   {% endfor %}
 
+  return success;
 }
 
 {% endfor %}
@@ -227,7 +257,9 @@ int {{functionPrefix}}parseConfig (
     bool    assignAddresses,
     bool    continueOnError,
     mapping addressActiveControl = makeMapping(),
-    mapping connectionSettings = makeMapping())
+    mapping connectionSettings = makeMapping(),
+    string  dpeNamePrefix="",
+    int     driverNumber={{driverNumber}})
 /* Create instances */
 {
 
@@ -314,7 +346,7 @@ int {{functionPrefix}}parseConfig (
       dyn_int children = {{functionPrefix}}getChildNodesWithName(docNum, firstNode, "{{ho.get('class')}}");
       for (int i = 1; i<=dynlen(children); i++)
       {
-        {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+        {{functionPrefix}}configureFromXML{{ho.get('class')}} (docNum, children[i], "", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings, dpeNamePrefix);
       }
     {% elif ho.get('instantiateUsing') == 'design' %}
       {{debug("WARNING: Skipping objects instantiated by design. For pure design instantiation ")}}
