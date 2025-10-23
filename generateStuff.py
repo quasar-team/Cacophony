@@ -15,6 +15,7 @@ from transformDesign import transformDesign
 from DesignInspector import DesignInspector
 from quasarExceptions import DesignFlaw
 import quasar_basic_utils
+from merge_design_and_meta import merge_user_and_meta_design
 
 # we use template_debug to print out to keep uniform debug style with what comes out as debug
 # from the transform itself
@@ -107,6 +108,8 @@ def main():
     parser.add_argument("--driver_number", dest="driver_number", default="69")
     parser.add_argument("--subscription", dest="subscription", default="MyQuasarSubscription")
     parser.add_argument("--function_prefix", dest="function_prefix", default="")
+    parser.add_argument("--use_design_with_meta", dest="use_design_with_meta", action="store_true",
+                        help="Merge Design.xml with Meta design and use DesignWithMeta.xml for generation")
     args = parser.parse_args()
 
     additional_params = {
@@ -124,7 +127,37 @@ def main():
 
     cacophony_root = os.path.dirname(os.path.sep.join([os.getcwd(), sys.argv[0]]))
     print('Cacophony root is at: ' + cacophony_root)
-    design_xml_path: str = os.path.join(os.getcwd(), 'Design', 'Design.xml')
+
+    # Determine which design file to use
+    if args.use_design_with_meta:
+        print(Fore.YELLOW + "Using DesignWithMeta (merging Design.xml with meta-design.xml)..." + Style.RESET_ALL)
+        design_xml_filename = 'DesignWithMeta.xml'
+        design_xml_path: str = os.path.join(os.getcwd(), 'Design', design_xml_filename)
+
+        # Create the merged design file
+        user_design_path = os.path.join(os.getcwd(), 'Design', 'Design.xml')
+        meta_design_path = os.path.join(os.getcwd(), 'Meta', 'design', 'meta-design.xml')
+
+        # Check that required files exist
+        if not os.path.isfile(user_design_path):
+            raise FileNotFoundError(f"User design file not found: {user_design_path}")
+        if not os.path.isfile(meta_design_path):
+            raise FileNotFoundError(f"Meta design file not found: {meta_design_path}")
+
+        print(f"  Merging: {user_design_path}")
+        print(f"      with: {meta_design_path}")
+        print(f"      into: {design_xml_path}")
+
+        with open(user_design_path, mode='r', encoding='utf-8') as user_file, \
+             open(meta_design_path, mode='r', encoding='utf-8') as meta_file, \
+             open(design_xml_path, mode='w', encoding='utf-8') as merged_file:
+            merge_user_and_meta_design(user_file, meta_file, merged_file)
+
+        print(Fore.GREEN + "  DesignWithMeta.xml created successfully!" + Style.RESET_ALL)
+    else:
+        print(Fore.YELLOW + "Using Design.xml (default behavior)" + Style.RESET_ALL)
+        design_xml_path: str = os.path.join(os.getcwd(), 'Design', 'Design.xml')
+
     try:
         handle_float_variables()
         transformDesign(
@@ -150,6 +183,12 @@ def main():
             requiresMerge=False,
             astyleRun=True,
             additionalParam=additional_params)
+
+        # Clean up: delete DesignWithMeta.xml if it was created
+        if args.use_design_with_meta and os.path.isfile(design_xml_path):
+            os.remove(design_xml_path)
+            print(Fore.YELLOW + f"  Cleaned up: {design_xml_path} deleted" + Style.RESET_ALL)
+
     except:
         quasar_basic_utils.quasaric_exception_handler()
 if __name__ == "__main__":
