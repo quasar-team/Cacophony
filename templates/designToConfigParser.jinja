@@ -223,9 +223,16 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   // Parse children instantiated from design
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='design']")%}
     {% for obj in ho.object %}
-      {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+      bool childSuccess = {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+      if (!childSuccess && !continueOnError)
+      {
+        DebugTN("Failed to configure design-instantiated child {{obj.get('name')}} of class {{ho.get('class')}}");
+        return false;
+      }
     {% endfor %}
   {% endfor %}
+
+  return true;
 }
 
 {% endfor %}
