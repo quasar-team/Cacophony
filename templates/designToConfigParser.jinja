@@ -140,7 +140,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   mapping addressActiveControl,
 	mapping connectionSettings)
 {
-  DebugTN("Configure.{{class_name}} called without XML");
+  DebugTN("ConfigureFromName.{{class_name}} called");
   string fullName = prefix+name;
   string dpt = "{{typePrefix}}{{class_name}}";
 
@@ -220,8 +220,8 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
     }
   }
 
-  // Parse children instantiated from design
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='design']")%}
+    // Parse design-instantiated children of class {{ho.get('class')}}
     {% for obj in ho.object %}
       bool childSuccess = {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
       if (!childSuccess && !continueOnError)
