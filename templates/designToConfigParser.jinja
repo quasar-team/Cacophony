@@ -119,6 +119,29 @@ bool {{functionPrefix}}configure{{class_name}} (
   }
 
   string fullName = prefix+name;
+  bool success = {{functionPrefix}}configureFromName{{class_name}}(name, prefix, createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+
+  dyn_int children;
+  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
+    children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
+    for (int i=1; i<=dynlen(children); i++)
+    {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+  {% endfor %}
+
+  return success;
+}
+
+bool {{functionPrefix}}configureFromName{{class_name}} (
+  string  name,
+  string  prefix,
+  bool    createDps,
+  bool    assignAddresses,
+  bool    continueOnError,
+  mapping addressActiveControl,
+	mapping connectionSettings)
+{
+  DebugTN("ConfigureFromName.{{class_name}} called");
+  string fullName = prefix+name;
   string dpt = "{{typePrefix}}{{class_name}}";
 
   if ({{functionPrefix}}dpTypeExists(dpt))
@@ -197,13 +220,19 @@ bool {{functionPrefix}}configure{{class_name}} (
     }
   }
 
-  dyn_int children;
-  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
-    children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
-    for (int i=1; i<=dynlen(children); i++)
-    {{functionPrefix}}configure{{ho.get('class')}} (docNum, children[i], fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+  {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='design']")%}
+    // Parse design-instantiated children of class {{ho.get('class')}}
+    {% for obj in ho.object %}
+      bool childSuccess = {{functionPrefix}}configureFromName{{ho.get('class')}}("{{obj.get('name')}}", fullName+"/", createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
+      if (!childSuccess && !continueOnError)
+      {
+        DebugTN("Failed to configure design-instantiated child {{obj.get('name')}} of class {{ho.get('class')}}");
+        return false;
+      }
+    {% endfor %}
   {% endfor %}
 
+  return true;
 }
 
 {% endfor %}
