@@ -101,7 +101,7 @@ bool {{functionPrefix}}configure{{class_name}} (
   bool    assignAddresses,
   bool    continueOnError,
   mapping addressActiveControl,
-	mapping connectionSettings)
+  mapping connectionSettings)
 {
   DebugTN("Configure.{{class_name}} called");
   string name;
@@ -286,7 +286,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   bool    assignAddresses,
   bool    continueOnError,
   mapping addressActiveControl,
-	mapping connectionSettings)
+  mapping connectionSettings)
 {
   DebugTN("ConfigureFromName.{{class_name}} called");
   string fullName = prefix+name;
@@ -333,7 +333,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
         	connectionSettings,
           active);
 
-        if (!success)
+        if (!success && !continueOnError)
         {
            DebugTN("Failed setting address "+address+"; will terminate now.");
            return false;
@@ -358,7 +358,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
         	connectionSettings,
           active);
 
-        if (!success)
+        if (!success && !continueOnError)
         {
            DebugTN("Failed setting address "+address+"; will terminate now.");
            return false;
