@@ -48,3 +48,18 @@ In this scenario, Cacophony will:
 - Automatically instantiate design-defined children for each `AMAC` instance
 
 Thanks to iTk Strips team (and more specifically to Kees Benkendorfer) for their contribution
+
+Calculated Variables Support
+-----------------------------
+
+If you need to include calculated variables in your generation:
+
+Run with the `--config_file` option and provide a configuration XML file,
+```bash
+python3 Cacophony/generateStuff.py --config_file config.xml
+```
+
+This will:
+- Detect unique calculated variable profiles per class
+- Generate separate DPTs for each profile (e.g., `[<DPT_prefix>]classname_CVX`)
+- Generate the appropriate configuration based on each profile classification
