@@ -9,7 +9,6 @@ ConfigInspector.py
 from lxml import etree
 import logging
 import os
-import re
 
 DEBUG = False
 
@@ -109,54 +108,77 @@ class ConfigInspector():
 
     def _preprocess_config_with_entities(self, configPath):
         """
-        Preprocess configuration file to manually expand external entities.
-        This solves the namespace mismatch issue when entity files don't have
-        proper namespace declarations.
+        Preprocess configuration file to expand external entities using xmllint.
+        This uses the same entity expansion method as the CTL runtime (xmllint --noent)
+        to ensure consistent handling of entities between build time and runtime.
 
         Returns a file-like object with the preprocessed content.
+
+        Raises:
+            FileNotFoundError: if xmllint is not available
+            Exception: if xmllint fails to process the file
         """
-        config_dir = os.path.dirname(os.path.abspath(configPath))
+        import subprocess
+        import tempfile
+        import shutil
 
-        with open(configPath, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Check if xmllint is available
+        if shutil.which('xmllint') is None:
+            raise FileNotFoundError(
+                "ERROR: 'xmllint' command not found. "
+                "Please install libxml2-utils (Debian/Ubuntu) or libxml2 (RHEL/CentOS). "
+                "xmllint is required for entity expansion in configuration files."
+            )
 
-        # Find DOCTYPE declaration with entity definitions
-        # Pattern: <!ENTITY name SYSTEM "path">
-        entity_pattern = r'<!ENTITY\s+(\w+)\s+SYSTEM\s+"([^"]+)">'
-        entities = {}
+        # Create temporary file for expanded content
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.xml', prefix='config_expanded_')
 
-        for match in re.finditer(entity_pattern, content):
-            entity_name = match.group(1)
-            entity_path = match.group(2)
+        try:
+            # Close the file descriptor as we'll write via subprocess
+            os.close(temp_fd)
 
-            # Resolve relative paths
-            full_entity_path = os.path.join(config_dir, entity_path)
+            # Use xmllint --noent to expand entities (same as CTL runtime)
+            # This ensures consistent entity resolution between build time and runtime
+            result = subprocess.run(
+                ['xmllint', '--noent', configPath],
+                capture_output=True,
+                text=True,
+                check=False  # We'll check return code manually
+            )
 
-            if os.path.exists(full_entity_path):
-                with open(full_entity_path, 'r', encoding='utf-8') as ef:
-                    entity_content = ef.read().strip()
-                    entities[entity_name] = entity_content
-                    if DEBUG:
-                        logging.debug(f'Loaded entity {entity_name} from {entity_path}')
-            else:
-                logging.warning(f'Entity file not found: {full_entity_path}')
-                entities[entity_name] = ''  # Empty content for missing files
+            if result.returncode != 0:
+                raise Exception(
+                    f"ERROR: xmllint failed to process configuration file '{configPath}'. "
+                    f"Return code: {result.returncode}\n"
+                    f"Error output: {result.stderr}"
+                )
 
-        # Replace entity references with actual content
-        for entity_name, entity_content in entities.items():
-            # Pattern: &ENTITY_NAME;
-            entity_ref = f'&{entity_name};'
-            content = content.replace(entity_ref, entity_content)
+            # Write expanded content to temp file
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                f.write(result.stdout)
 
-        # Remove DOCTYPE declaration (no longer needed after expansion)
-        content = re.sub(r'<!DOCTYPE[^>]*\[.*?\]>', '', content, flags=re.DOTALL)
+            if DEBUG:
+                logging.debug(f'Entity expansion completed using xmllint for: {configPath}')
+                logging.debug(f'Expanded content written to temporary file: {temp_path}')
 
-        # Remove XML declaration for StringIO parsing (lxml requirement)
-        content = re.sub(r'<\?xml[^>]*\?>\s*', '', content)
+            # Return file-like object (BytesIO) for lxml to parse
+            from io import BytesIO
+            return BytesIO(result.stdout.encode('utf-8'))
 
-        # Create a temporary file-like object with bytes
-        from io import BytesIO
-        return BytesIO(content.encode('utf-8'))
+        except Exception:
+            # Clean up temp file on error
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise
+
+        finally:
+            # Clean up temp file after parsing (best effort)
+            # Note: The BytesIO object contains the content, so we can delete the file
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass  # Ignore cleanup errors
 
     def _extract_calculated_variables(self):
         """
