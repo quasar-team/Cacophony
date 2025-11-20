@@ -31,6 +31,52 @@ class ConfigInspector():
         self.tree = etree.parse(processed_config, parser)
         self.calculated_variables = self._extract_calculated_variables()
 
+    def xpath(self, expr, *args):
+        """Just a wrapper on top of etree.xpath that does quasar config namespaces mapping"""
+        xpath_expr = expr.format(*args)
+        result = self.tree.xpath(xpath_expr, namespaces=QUASAR_CONFIG_NAMESPACES)
+        if DEBUG:
+            logging.debug(f"xpath({xpath_expr}) gives {result}")
+        return result
+
+    def _validate_class_exists(self, class_name):
+        """
+        Validate that a class exists in the configuration file.
+        Raises an exception if the class is not found.
+
+        Returns: True if class exists
+        Raises: Exception if class not found
+        """
+        xpath = f'//c:{class_name}'
+        instances = self.xpath(xpath)
+
+        if not instances:
+            raise Exception(
+                f"ERROR: Class '{class_name}' NOT FOUND in configuration file. "
+                f"No instances of this class exist in the configuration."
+            )
+        return True
+
+    def _validate_instance_exists(self, class_name, instance_name):
+        """
+        Validate that a specific instance exists in the configuration file.
+
+        Returns: The instance element if found
+        Raises: Exception if class or instance not found
+        """
+        # First validate class exists
+        self._validate_class_exists(class_name)
+
+        # Then check for specific instance
+        xpath = f'//c:{class_name}[@name="{instance_name}"]'
+        instances = self.xpath(xpath)
+
+        if not instances:
+            raise Exception(
+                f"ERROR: Instance '{instance_name}' of class '{class_name}' NOT FOUND in configuration file."
+            )
+        return instances[0]
+
     def _preprocess_config_with_entities(self, configPath):
         """
         Preprocess configuration file to manually expand external entities.
@@ -92,7 +138,7 @@ class ConfigInspector():
         calc_vars_by_class = {}  # Track variables per class for your approach
 
         # Find all CalculatedVariable elements (using namespace)
-        calc_var_elements = self.tree.xpath('//c:CalculatedVariable', namespaces=QUASAR_CONFIG_NAMESPACES)
+        calc_var_elements = self.xpath('//c:CalculatedVariable')
 
         for cv_elem in calc_var_elements:
             name = cv_elem.get('name')
@@ -115,8 +161,16 @@ class ConfigInspector():
                         'parentClasses': set()
                     }
                 else:
-                    # If same variable appears with different types, prefer boolean detection
-                    if is_boolean:
+                    # Check for type conflicts
+                    existing_type = calc_vars[name]['isBoolean']
+                    if existing_type != is_boolean:
+                        logging.warning(
+                            f"Type conflict for calculated variable '{name}' in class '{parent_class}': "
+                            f"previously isBoolean={existing_type}, now found isBoolean={is_boolean}. "
+                            f"Using isBoolean=True (boolean type takes precedence)."
+                        )
+                        calc_vars[name]['isBoolean'] = True
+                    elif is_boolean:
                         calc_vars[name]['isBoolean'] = True
 
                 calc_vars[name]['parentClasses'].add(parent_class)
@@ -131,8 +185,16 @@ class ConfigInspector():
                         'occurrences': 0
                     }
                 else:
-                    # If same variable in same class has different types, prefer boolean
-                    if is_boolean:
+                    # Check for type conflicts within the same class
+                    existing_type = calc_vars_by_class[parent_class][name]['isBoolean']
+                    if existing_type != is_boolean:
+                        logging.warning(
+                            f"Type conflict for calculated variable '{name}' within class '{parent_class}': "
+                            f"previously isBoolean={existing_type}, now found isBoolean={is_boolean}. "
+                            f"Using isBoolean=True (boolean type takes precedence)."
+                        )
+                        calc_vars_by_class[parent_class][name]['isBoolean'] = True
+                    elif is_boolean:
                         calc_vars_by_class[parent_class][name]['isBoolean'] = True
 
                 calc_vars_by_class[parent_class][name]['occurrences'] += 1
@@ -213,14 +275,26 @@ class ConfigInspector():
             ...
         }
         Note: The profile number is the dict key (e.g., '1', '2', '3')
+
+        Returns empty dict {} if:
+        - Class doesn't exist in configuration (normal - not all design classes are instantiated)
+        - Class exists but has no calculated variables (normal - CVs are optional)
         """
         profiles = {}
         profile_lookup = {}  # Map signature_full to profile_id for fast lookup
         next_profile_number = 1
 
         # Find all instances of this class that have CalculatedVariables
+        # NOTE: Don't validate class exists - templates call this for ALL design classes,
+        # but not all design classes are instantiated in configuration
         xpath = f'//c:{class_name}[c:CalculatedVariable]'
-        instances = self.tree.xpath(xpath, namespaces=QUASAR_CONFIG_NAMESPACES)
+        instances = self.xpath(xpath)
+
+        # Return empty dict if class not in config OR class has no CVs (both are normal)
+        if not instances:
+            if DEBUG:
+                logging.debug(f'Class {class_name} has no CV profiles (not in config or no CVs)')
+            return {}
 
         for instance in instances:
             instance_name = instance.get('name', 'unknown')
@@ -263,10 +337,22 @@ class ConfigInspector():
 
                 profile_lookup[signature_full] = profile_id
 
-        if DEBUG:
-            logging.debug(f'CV profiles for class {class_name}: {profiles}')
+        # Sort signatures alphabetically to ensure profile numbering independent of XML element order
+        sorted_signatures = sorted(profile_lookup.keys())
 
-        return profiles
+        # Reassign profile IDs based on sorted signature order
+        final_profiles = {}
+        for idx, signature in enumerate(sorted_signatures, start=1):
+            old_profile_id = profile_lookup[signature]
+            new_profile_id = str(idx)
+
+            # Copy profile data with new deterministic ID
+            final_profiles[new_profile_id] = profiles[old_profile_id]
+
+        if DEBUG:
+            logging.debug(f'CV profiles for class {class_name}: {final_profiles}')
+
+        return final_profiles
 
     def get_instance_cv_profile(self, class_name, instance_name):
         """
@@ -274,21 +360,19 @@ class ConfigInspector():
 
         Returns:
         - profile_id (str) if the instance has calculated variables
-        - None if the instance has no calculated variables or doesn't exist
+        - None if the instance has no calculated variables
+
+        Raises:
+        - Exception if class or instance not found in configuration
         """
-        # Find the specific instance
-        xpath = f'//c:{class_name}[@name="{instance_name}"]'
-        instances = self.tree.xpath(xpath, namespaces=QUASAR_CONFIG_NAMESPACES)
-
-        if not instances:
-            return None
-
-        instance = instances[0]
+        # Validate instance exists (raises exception if class or instance not found)
+        instance = self._validate_instance_exists(class_name, instance_name)
 
         # Get all CV names for this instance
         cv_elements = instance.xpath('./c:CalculatedVariable', namespaces=QUASAR_CONFIG_NAMESPACES)
         cv_names = sorted([cv.get('name') for cv in cv_elements if cv.get('name')])
 
+        # Valid instance with no CVs - return None (normal operation)
         if not cv_names:
             return None
 
