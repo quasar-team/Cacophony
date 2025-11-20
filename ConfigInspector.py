@@ -77,6 +77,36 @@ class ConfigInspector():
             )
         return instances[0]
 
+    def _validate_cv_name(self, name, parent_class, instance_name=None):
+        """
+        Validate calculated variable name is non-empty and non-whitespace.
+
+        Args:
+            name: The calculated variable name to validate
+            parent_class: The class containing this calculated variable
+            instance_name: Optional instance name for more specific error messages
+
+        Returns: True if valid
+        Raises: Exception if name is None, empty, or only whitespace
+        """
+        location = f"class '{parent_class}'"
+        if instance_name:
+            location = f"instance '{instance_name}' of class '{parent_class}'"
+
+        if not name:
+            raise Exception(
+                f"ERROR: CalculatedVariable in {location} has missing or empty 'name' attribute. "
+                f"All calculated variables must have a non-empty name."
+            )
+
+        if not name.strip():
+            raise Exception(
+                f"ERROR: CalculatedVariable in {location} has whitespace-only 'name' attribute: '{name}'. "
+                f"Calculated variable names must contain non-whitespace characters."
+            )
+
+        return True
+
     def _preprocess_config_with_entities(self, configPath):
         """
         Preprocess configuration file to manually expand external entities.
@@ -153,7 +183,9 @@ class ConfigInspector():
             else:
                 parent_class = 'Unknown'
 
-            if name:
+            # Validate CV name is non-empty and non-whitespace
+            if name and name.strip():
+                self._validate_cv_name(name, parent_class)
                 # Global tracking (all calculated variables)
                 if name not in calc_vars:
                     calc_vars[name] = {
@@ -301,7 +333,16 @@ class ConfigInspector():
 
             # Get all CV names for this specific instance
             cv_elements = instance.xpath('./c:CalculatedVariable', namespaces=QUASAR_CONFIG_NAMESPACES)
-            cv_names = sorted([cv.get('name') for cv in cv_elements if cv.get('name')])
+
+            # Validate and collect CV names (filter out empty/whitespace-only names)
+            cv_names = []
+            for cv_elem in cv_elements:
+                name = cv_elem.get('name')
+                if name and name.strip():
+                    self._validate_cv_name(name, class_name, instance_name)
+                    cv_names.append(name)
+
+            cv_names = sorted(cv_names)
 
             if not cv_names:
                 continue
@@ -323,7 +364,7 @@ class ConfigInspector():
                 cv_info = {}
                 for cv_elem in cv_elements:
                     name = cv_elem.get('name')
-                    if name:
+                    if name and name.strip():
                         is_boolean = cv_elem.get('isBoolean', 'false').lower() == 'true'
                         cv_info[name] = {'isBoolean': is_boolean}
 
