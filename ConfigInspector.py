@@ -356,21 +356,30 @@ class ConfigInspector():
             # Get all CV names for this specific instance
             cv_elements = instance.xpath('./c:CalculatedVariable', namespaces=QUASAR_CONFIG_NAMESPACES)
 
-            # Validate and collect CV names (filter out empty/whitespace-only names)
-            cv_names = []
+            # Validate and collect CV names with type information (filter out empty/whitespace-only names)
+            signature_components = []
+            cv_info_temp = {}
             for cv_elem in cv_elements:
                 name = cv_elem.get('name')
                 if name and name.strip():
                     self._validate_cv_name(name, class_name, instance_name)
-                    cv_names.append(name)
+                    is_boolean = cv_elem.get('isBoolean', 'false').lower() == 'true'
+                    cv_info_temp[name] = {'isBoolean': is_boolean}
+                    # Include type in signature: (name, isBoolean)
+                    signature_components.append((name, is_boolean))
 
-            cv_names = sorted(cv_names)
+            # Sort by name for consistency
+            signature_components.sort(key=lambda x: x[0])
 
-            if not cv_names:
+            if not signature_components:
                 continue
 
-            # Create full signature (tuple of sorted names for uniqueness)
-            signature_full = tuple(cv_names)
+            # Create full signature with type information: (('current', False), ('voltage', False))
+            # This ensures instances with same CV names but different types get separate profiles
+            signature_full = tuple(signature_components)
+
+            # Extract just the names for cv_names list
+            cv_names = sorted([comp[0] for comp in signature_components])
 
             # Check if we've seen this signature before
             if signature_full in profile_lookup:
@@ -382,18 +391,10 @@ class ConfigInspector():
                 profile_id = str(next_profile_number)
                 next_profile_number += 1
 
-                # Build cv_info from the elements
-                cv_info = {}
-                for cv_elem in cv_elements:
-                    name = cv_elem.get('name')
-                    if name and name.strip():
-                        is_boolean = cv_elem.get('isBoolean', 'false').lower() == 'true'
-                        cv_info[name] = {'isBoolean': is_boolean}
-
                 profiles[profile_id] = {
                     'signature_full': signature_full,
                     'cv_names': cv_names,
-                    'cv_info': cv_info,
+                    'cv_info': cv_info_temp,
                     'instance_names': [instance_name],
                     'instance_count': 1
                 }
