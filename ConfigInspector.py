@@ -33,7 +33,7 @@ class ConfigInspector():
         # Parse the preprocessed configuration
         parser = etree.XMLParser()
         self.tree = etree.parse(processed_config, parser)
-        self.calculated_variables = self._extract_calculated_variables()
+        self.calc_vars_by_class = self._extract_calculated_variables()
 
     def xpath(self, expr, *args):
         """Just a wrapper on top of etree.xpath that does quasar config namespaces mapping"""
@@ -187,12 +187,19 @@ class ConfigInspector():
 
     def _extract_calculated_variables(self):
         """
-        Extract all unique calculated variables from the configuration file.
-        Returns a dict with calculated variable names as keys and type info as values.
-        Format: {'varName': {'isBoolean': False, 'parentClasses': ['ClassName1', 'ClassName2']}}
+        Extract calculated variables from the configuration file organized by parent class.
+
+        Returns: {
+            'ClassName': {
+                'varName': {'isBoolean': False, 'occurrences': 3},
+                ...
+            },
+            ...
+        }
         """
-        calc_vars = {}
-        calc_vars_by_class = {}  # Track variables per class for your approach
+        calc_vars_by_class = {}
+        # Temporary dict for cross-class type conflict warnings only
+        global_cv_types = {}
 
         # Find all CalculatedVariable elements (using namespace)
         calc_var_elements = self.xpath('//c:CalculatedVariable')
@@ -213,26 +220,27 @@ class ConfigInspector():
             # Validate CV name is non-empty and non-whitespace
             if name and name.strip():
                 self._validate_cv_name(name, parent_class)
-                # Global tracking (all calculated variables)
-                if name not in calc_vars:
-                    calc_vars[name] = {
+
+                # Track globally for cross-class type conflict warnings
+                if name not in global_cv_types:
+                    global_cv_types[name] = {
                         'isBoolean': is_boolean,
-                        'parentClasses': set()
+                        'first_class': parent_class
                     }
                 else:
-                    # Check for type conflicts
-                    existing_type = calc_vars[name]['isBoolean']
+                    # Check for cross-class type conflicts
+                    existing_type = global_cv_types[name]['isBoolean']
                     if existing_type != is_boolean:
+                        first_class = global_cv_types[name]['first_class']
                         logging.warning(
-                            f"Type conflict for calculated variable '{name}' in class '{parent_class}': "
-                            f"previously isBoolean={existing_type}, now found isBoolean={is_boolean}. "
+                            f"Cross-class type conflict for calculated variable '{name}': "
+                            f"defined as isBoolean={existing_type} in class '{first_class}', "
+                            f"but as isBoolean={is_boolean} in class '{parent_class}'. "
                             f"Using isBoolean=True (boolean type takes precedence)."
                         )
-                        calc_vars[name]['isBoolean'] = True
+                        global_cv_types[name]['isBoolean'] = True
                     elif is_boolean:
-                        calc_vars[name]['isBoolean'] = True
-
-                calc_vars[name]['parentClasses'].add(parent_class)
+                        global_cv_types[name]['isBoolean'] = True
 
                 # Per-class tracking
                 if parent_class not in calc_vars_by_class:
@@ -258,42 +266,11 @@ class ConfigInspector():
 
                 calc_vars_by_class[parent_class][name]['occurrences'] += 1
 
-        # Convert sets to lists for easier Jinja2 handling
-        for var_name in calc_vars:
-            calc_vars[var_name]['parentClasses'] = list(calc_vars[var_name]['parentClasses'])
-
-        # Store by-class information
-        self.calc_vars_by_class = calc_vars_by_class
-
         if DEBUG:
-            logging.debug(f'Calculated variables found: {calc_vars}')
             logging.debug(f'Calculated variables by class: {calc_vars_by_class}')
 
-        return calc_vars
-
-    def get_calculated_variable_names(self):
-        """Returns a list of all unique calculated variable names"""
-        return list(self.calculated_variables.keys())
-
-    def get_calculated_variables_info(self):
-        """Returns the complete dictionary of calculated variable information"""
-        return self.calculated_variables
-
-    def has_calculated_variables(self):
-        """Returns True if any calculated variables are present in the config"""
-        return len(self.calculated_variables) > 0
-
-    def is_calculated_variable_boolean(self, var_name):
-        """Returns True if the specified calculated variable is boolean type"""
-        if var_name in self.calculated_variables:
-            return self.calculated_variables[var_name]['isBoolean']
-        return False
-
-    def get_calculated_variable_parent_classes(self, var_name):
-        """Returns list of parent classes that contain this calculated variable"""
-        if var_name in self.calculated_variables:
-            return self.calculated_variables[var_name]['parentClasses']
-        return []
+        # Return by-class information
+        return calc_vars_by_class
 
     def get_calculated_variables_by_parent_class(self):
         """
@@ -496,16 +473,18 @@ if __name__ == "__main__":
         # Create inspector instance
         inspector = ConfigInspector(config_path)
 
-        # Test 1: Get calculated variable names
+        # Test 1: Get all unique calculated variable names
         print(f"{Fore.GREEN}1. Calculated Variables:{Style.RESET_ALL}")
-        cv_names = inspector.get_calculated_variable_names()
-        print(f"   Found {len(cv_names)} unique calculated variable(s): {', '.join(cv_names)}\n")
+        all_cv_names = set()
+        for class_cvs in inspector.calc_vars_by_class.values():
+            all_cv_names.update(class_cvs.keys())
+        print(f"   Found {len(all_cv_names)} unique calculated variable(s): {', '.join(sorted(all_cv_names))}\n")
 
         # Test 2: Get calculated variables by parent class
         print(f"{Fore.GREEN}2. Calculated Variables by Parent Class:{Style.RESET_ALL}")
-        cv_by_class = inspector.get_calculated_variables_by_parent_class()
-        for class_name, vars_list in cv_by_class.items():
-            print(f"   {class_name}: {len(vars_list)} variable(s) - {', '.join(vars_list)}")
+        for class_name, class_cvs in inspector.calc_vars_by_class.items():
+            cv_names = sorted(class_cvs.keys())
+            print(f"   {class_name}: {len(cv_names)} variable(s) - {', '.join(cv_names)}")
         print()
 
         # Test 3: Get CV profiles for all classes

@@ -132,11 +132,15 @@ def main():
         config_inspector = ConfigInspector(config_file_path)
         additional_params['configInspector'] = config_inspector
 
-        # Print summary
-        cv_by_class = config_inspector.get_calculated_variables_by_parent_class()
-        print(Fore.GREEN + f"  Found {len(config_inspector.get_calculated_variable_names())} unique calculated variable(s):" + Style.RESET_ALL)
-        for class_name, calc_vars in cv_by_class.items():
-            print(Fore.BLUE + f"    {class_name}: {len(calc_vars)} variable(s) - {', '.join(sorted(calc_vars))}" + Style.RESET_ALL)
+        # Print summary - get all unique CV names across all classes
+        all_cv_names = set()
+        for class_cvs in config_inspector.calc_vars_by_class.values():
+            all_cv_names.update(class_cvs.keys())
+
+        print(Fore.GREEN + f"  Found {len(all_cv_names)} unique calculated variable(s):" + Style.RESET_ALL)
+        for class_name, class_cvs in config_inspector.calc_vars_by_class.items():
+            cv_names = sorted(class_cvs.keys())
+            print(Fore.BLUE + f"    {class_name}: {len(cv_names)} variable(s) - {', '.join(cv_names)}" + Style.RESET_ALL)
     else:
         additional_params['configInspector'] = None
 
