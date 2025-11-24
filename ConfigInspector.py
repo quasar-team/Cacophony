@@ -10,7 +10,12 @@ from lxml import etree
 import logging
 import os
 
+# Configure logging with default WARNING level
+# To enable debug messages, set level=logging.DEBUG before importing this module
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
+
 DEBUG = False
+DEBUG_XPATH = False
 
 # Quasar Configuration namespace
 QUASAR_CONFIG_NAMESPACES = {'c': 'http://cern.ch/quasar/Configuration'}
@@ -34,7 +39,7 @@ class ConfigInspector():
         """Just a wrapper on top of etree.xpath that does quasar config namespaces mapping"""
         xpath_expr = expr.format(*args)
         result = self.tree.xpath(xpath_expr, namespaces=QUASAR_CONFIG_NAMESPACES)
-        if DEBUG:
+        if DEBUG_XPATH:
             logging.debug(f"xpath({xpath_expr}) gives {result}")
         return result
 
@@ -473,3 +478,60 @@ class ConfigInspector():
                 all_profiles[class_name] = profiles
 
         return all_profiles
+
+if __name__ == "__main__":
+    """Test fixture for manual testing and validation"""
+    import sys
+    from colorama import Fore, Style
+
+    # Default config path (can be overridden via command line)
+    config_path = 'bin/config.xml'
+    if len(sys.argv) > 1:
+        config_path = sys.argv[1]
+
+    print(f"{Fore.CYAN}ConfigInspector Test Fixture{Style.RESET_ALL}")
+    print(f"Config file: {config_path}\n")
+
+    try:
+        # Create inspector instance
+        inspector = ConfigInspector(config_path)
+
+        # Test 1: Get calculated variable names
+        print(f"{Fore.GREEN}1. Calculated Variables:{Style.RESET_ALL}")
+        cv_names = inspector.get_calculated_variable_names()
+        print(f"   Found {len(cv_names)} unique calculated variable(s): {', '.join(cv_names)}\n")
+
+        # Test 2: Get calculated variables by parent class
+        print(f"{Fore.GREEN}2. Calculated Variables by Parent Class:{Style.RESET_ALL}")
+        cv_by_class = inspector.get_calculated_variables_by_parent_class()
+        for class_name, vars_list in cv_by_class.items():
+            print(f"   {class_name}: {len(vars_list)} variable(s) - {', '.join(vars_list)}")
+        print()
+
+        # Test 3: Get CV profiles for all classes
+        print(f"{Fore.GREEN}3. CV Profiles:{Style.RESET_ALL}")
+        all_profiles = inspector.get_all_cv_profiles()
+        for class_name, profiles in all_profiles.items():
+            print(f"   {class_name}: {len(profiles)} profile(s)")
+            for profile_id, profile_data in profiles.items():
+                print(f"      Profile {profile_id}:")
+                print(f"         Signature: {profile_data['signature_full']}")
+                print(f"         CV Names: {', '.join(profile_data['cv_names'])}")
+                print(f"         Instance count: {profile_data['instance_count']}")
+                # Show first 3 instances
+                instances_str = ', '.join(profile_data['instance_names'][:3])
+                if profile_data['instance_count'] > 3:
+                    instances_str += f" ... (+{profile_data['instance_count'] - 3} more)"
+                print(f"         Instances: {instances_str}")
+
+        print(f"\n{Fore.GREEN}All tests completed successfully{Style.RESET_ALL}")
+
+    except FileNotFoundError as e:
+        print(f"{Fore.RED}ERROR: {e}{Style.RESET_ALL}")
+        print(f"\nUsage: python3 ConfigInspector.py [path/to/config.xml]")
+        sys.exit(1)
+    except Exception as e:
+        print(f"{Fore.RED}ERROR: {e}{Style.RESET_ALL}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
