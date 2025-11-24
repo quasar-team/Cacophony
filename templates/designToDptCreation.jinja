@@ -45,6 +45,38 @@ bool {{functionPrefix}}createDpt{{cls.get('name')}}()
   DebugN("{{functionPrefix}}createDpt{{cls.get('name')}}: completed, dpTypeChange returned status ["+status+"]");
   return status == 0;
 }
+
+{# Create separate DPTs for each calculated variable profile #}
+{% set cv_profiles = (configInspector.get_cv_profiles_for_class(class_name) if configInspector else {}) %}
+{% if cv_profiles %}
+  {% for profile_id, profile_data in cv_profiles.items() %}
+
+//{{cls.get('name')}}_CV{{profile_id}} - Calculated Variables Profile DPT
+// Profile contains: {{', '.join(profile_data['cv_names'])}}
+// Used by {{profile_data['instance_count']}} instance(s): {{', '.join(profile_data['instance_names'][:3])}}{% if profile_data['instance_count'] > 3 %}, ...{% endif %}
+
+bool {{functionPrefix}}createDpt{{cls.get('name')}}_CV{{profile_id}}()
+{
+  dyn_dyn_string xxdepes;
+  dyn_dyn_int xxdepei;
+  dynAppend(xxdepes, makeDynString("{{typePrefix}}{{cls.get('name')}}_CV{{profile_id}}", ""));
+  dynAppend(xxdepei, makeDynInt(DPEL_STRUCT));
+
+  {% for cv_name in profile_data['cv_names'] %}
+    dynAppend(xxdepes, makeDynString("", "{{cv_name}}"));
+    {% if profile_data['cv_info'][cv_name]['isBoolean'] %}
+    dynAppend(xxdepei, makeDynInt(0, DPEL_BOOL)); // Calculated variable (Boolean)
+    {% else %}
+    dynAppend(xxdepei, makeDynInt(0, DPEL_FLOAT)); // Calculated variable (Double)
+    {% endif %}
+  {% endfor %}
+
+  int status = dpTypeChange(xxdepes, xxdepei);
+  DebugN("{{functionPrefix}}createDpt{{cls.get('name')}}_CV{{profile_id}}: completed, dpTypeChange returned status ["+status+"]");
+  return status == 0;
+}
+  {% endfor %}
+{% endif %}
 {% endfor %}
 
 int {{functionPrefix}}createDpts (string dptFilter=".*")
@@ -59,6 +91,16 @@ int {{functionPrefix}}createDpts (string dptFilter=".*")
         DebugN("createDpts: creating DPT for class {{class_name}}");
         if (!{{functionPrefix}}createDpt{{cls.get('name')}}())
         return 1;
+
+        {# Create CV profile DPTs #}
+        {% set cv_profiles = (configInspector.get_cv_profiles_for_class(class_name) if configInspector else {}) %}
+        {% if cv_profiles %}
+          {% for profile_id, profile_data in cv_profiles.items() %}
+        DebugN("createDpts: creating CV profile DPT {{cls.get('name')}}_CV{{profile_id}}");
+        if (!{{functionPrefix}}createDpt{{cls.get('name')}}_CV{{profile_id}}())
+          return 1;
+          {% endfor %}
+        {% endif %}
       }
       else
       {
