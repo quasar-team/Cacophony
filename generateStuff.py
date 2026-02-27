@@ -13,6 +13,7 @@ sys.path.insert(0, 'FrameworkInternals')
 
 from transformDesign import transformDesign
 from DesignInspector import DesignInspector
+from ConfigInspector import ConfigInspector
 from quasarExceptions import DesignFlaw
 import quasar_basic_utils
 from merge_design_and_meta import merge_user_and_meta_design
@@ -110,6 +111,8 @@ def main():
     parser.add_argument("--function_prefix", dest="function_prefix", default="")
     parser.add_argument("--use_design_with_meta", dest="use_design_with_meta", action="store_true",
                         help="Merge Design.xml with Meta design and use DesignWithMeta.xml for generation")
+    parser.add_argument("--config_file", dest="config_file", default=None,
+                        help="Configuration XML file to enable calculated variable support")
     args = parser.parse_args()
 
     additional_params = {
@@ -119,8 +122,30 @@ def main():
         'subscriptionName' : args.subscription,
         'functionPrefix'   : args.function_prefix}
 
+    # Handle optional calculated variable support
+    config_inspector = None
+    if args.config_file:
+        config_file_path = os.path.join(os.getcwd(), 'bin', args.config_file)
+        if not os.path.isfile(config_file_path):
+            raise FileNotFoundError(f"Configuration file not found: {config_file_path}")
+        print(Fore.CYAN + f"Enabling calculated variable support from: {config_file_path}" + Style.RESET_ALL)
+        config_inspector = ConfigInspector(config_file_path)
+        additional_params['configInspector'] = config_inspector
+
+        # Print summary - get all unique CV names across all classes
+        all_cv_names = set()
+        for class_cvs in config_inspector.calc_vars_by_class.values():
+            all_cv_names.update(class_cvs.keys())
+
+        print(Fore.GREEN + f"  Found {len(all_cv_names)} unique calculated variable(s):" + Style.RESET_ALL)
+        for class_name, class_cvs in config_inspector.calc_vars_by_class.items():
+            cv_names = sorted(class_cvs.keys())
+            print(Fore.BLUE + f"    {class_name}: {len(cv_names)} variable(s) - {', '.join(cv_names)}" + Style.RESET_ALL)
+    else:
+        additional_params['configInspector'] = None
+
     print(Fore.GREEN + "For your information, current settings are: \n" + Fore.BLUE
-        + '\n'.join([('  {0:20} : {1}'.format(k, additional_params[k])) for k in additional_params.keys()])
+        + '\n'.join([('  {0:20} : {1}'.format(k, additional_params[k])) for k in additional_params.keys() if k != 'configInspector'])
         + Style.RESET_ALL)
 
     additional_params.update({'mapper' : quasar_data_type_to_dpt_type_constant})

@@ -101,7 +101,7 @@ bool {{functionPrefix}}configure{{class_name}} (
   bool    assignAddresses,
   bool    continueOnError,
   mapping addressActiveControl,
-	mapping connectionSettings)
+  mapping connectionSettings)
 {
   DebugTN("Configure.{{class_name}} called");
   string name;
@@ -121,6 +121,184 @@ bool {{functionPrefix}}configure{{class_name}} (
   string fullName = prefix+name;
   bool success = {{functionPrefix}}configureFromName{{class_name}}(name, prefix, createDps, assignAddresses, continueOnError, addressActiveControl, connectionSettings);
 
+  {# Only generate CV profile handling code for classes that actually have CVs #}
+  {% set cv_profiles = (configInspector.get_cv_profiles_for_class(class_name) if configInspector else {}) %}
+  {% if cv_profiles %}
+  // This class has {{cv_profiles|length}} CV profile(s)
+  dyn_int cvChildren = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "CalculatedVariable");
+
+  if (dynlen(cvChildren) > 0)
+  {
+    // Collect all CV names for this instance to determine profile
+    dyn_string cvNames;
+    for (int i=1; i<=dynlen(cvChildren); i++)
+    {
+      string cvName;
+      if(xmlGetElementAttribute(docNum, cvChildren[i], "name", cvName) == 0)
+      {
+        dynAppend(cvNames, cvName);
+      }
+    }
+    DebugTN("Collected CV names for this instance are:" + cvNames);
+    // Sort CV names to match profile detection logic
+    dynSortAsc(cvNames);
+
+    // Find matching CV profile DPT by checking structure
+    string profileId = "";
+
+    for (int profileNum = 1; profileNum <= {{cv_profiles|length}}; profileNum++)
+    {
+      string testDpt = "{{typePrefix}}{{class_name}}_CV" + profileNum;
+
+      // Check if this DPT has the same DPEs as our CV list
+      dyn_dyn_string elements;
+      dyn_dyn_int types;
+      dpTypeGet(testDpt, elements, types);
+      dyn_string dpeNames;
+
+      DebugTN("DEBUG: Checking profile " + testDpt + ", dpTypeGet returned " + dynlen(elements) + " elements");
+
+      // Validate dpTypeGet() returned data in expected format
+      if (dynlen(elements) < 2)
+      {
+        DebugTN("WARNING: dpTypeGet returned unexpected format for " + testDpt +
+                " (expected at least 2 elements, got " + dynlen(elements) + "). Skipping this profile.");
+        continue;
+      }
+
+      // First element should be the DPT name itself
+      if (dynlen(elements[1]) < 1 || elements[1][1] != testDpt)
+      {
+        DebugTN("WARNING: dpTypeGet first element is not DPT name as expected for " + testDpt);
+      }
+
+      // Extract DPE names starting from index 2 (index 1 contains DPT name)
+      for (int j=2; j<=dynlen(elements); j++)
+      {
+        // Validate each row has expected structure (at least 2 elements)
+        if (dynlen(elements[j]) < 2)
+        {
+          DebugTN("WARNING: Row " + j + " in dpTypeGet result has unexpected format " +
+                  "(length " + dynlen(elements[j]) + ", expected >= 2). Skipping this row.");
+          continue;
+        }
+
+        // Extract DPE name from index 2 of each row (index 1 is empty, index 2 is DPE name)
+        string dpeName = elements[j][2];
+        DebugTN("DEBUG:   Element " + j + ": DPE name: '" + dpeName + "'");
+
+        if (dpeName != "")
+          dynAppend(dpeNames, dpeName);
+      }
+
+      // Final validation: ensure we extracted some DPE names
+      if (dynlen(dpeNames) == 0)
+      {
+        DebugTN("WARNING: No DPE names extracted from " + testDpt +
+                " - dpTypeGet may have returned unexpected format. Skipping this profile.");
+        continue;
+      }
+
+      dynSortAsc(dpeNames);
+
+      DebugTN("DEBUG: After sorting, dpeNames has " + dynlen(dpeNames) + " items: " + strjoin(dpeNames, ", "));
+      DebugTN("DEBUG: Expected cvNames has " + dynlen(cvNames) + " items: " + strjoin(cvNames, ", "));
+
+      // Compare sorted DPE names with sorted CV names
+      if (dynlen(dpeNames) == dynlen(cvNames))
+      {
+        bool match = true;
+        for (int k=1; k<=dynlen(cvNames); k++)
+        {
+          if (cvNames[k] != dpeNames[k])
+          {
+            DebugTN("DEBUG: Mismatch at position " + k + ": '" + cvNames[k] + "' != '" + dpeNames[k] + "'");
+            match = false;
+            break;
+          }
+        }
+
+        if (match)
+        {
+          DebugTN("DEBUG: MATCH FOUND! Using profile " + profileNum);
+          profileId = (string)profileNum;
+          break;
+        }
+      }
+    }
+
+    if (profileId == "")
+    {
+      DebugTN("WARNING: Could not find matching CV profile DPT for instance "+fullName);
+      DebugTN("  CVs in instance: " + strjoin(cvNames, ", "));
+      DebugTN("  Skipping calculated variable processing for this instance.");
+      if (!continueOnError)
+        return false;
+      // Skip CV processing - don't create any CV datapoints without a valid profile
+    }
+    else
+    {
+      // Only execute CV DP creation when we have a valid profileId
+      string cvFullName = fullName + "_CV";
+      string cvDpt = "{{typePrefix}}{{class_name}}_CV"+profileId;
+
+      if (createDps)
+      {
+        if ({{functionPrefix}}dpTypeExists(cvDpt))
+        {
+          DebugTN("Will create CalculatedVariable profile DP "+cvFullName+" of type "+cvDpt);
+          int result = dpCreate(cvFullName, cvDpt);
+          if (result != 0)
+          {
+            DebugTN("dpCreate for CalculatedVariable profile DP '"+cvFullName+"' failed or already exists");
+            if (!continueOnError)
+              return false;
+          }
+        }
+        else
+        {
+          DebugTN("DPT "+cvDpt+" does not exist, cannot create CalculatedVariable profile DP "+cvFullName);
+          DebugTN("This may indicate a mismatch in CV profile detection. Expected profile: "+profileId);
+          if (!continueOnError)
+            return false;
+        }
+      }
+
+      if (assignAddresses)
+      {
+        // Configure addresses for each CV in the profile
+        for (int i=1; i<=dynlen(cvNames); i++)
+        {
+          string cvName = cvNames[i];
+          string cvDpe = cvFullName+"."+cvName;
+          string cvAddress = fullName+"."+cvName;  // Build address from base instance name (without _CV suffix)
+          strreplace(cvAddress, "/", ".");
+
+          bool cvActive = {{functionPrefix}}evaluateActive(
+            addressActiveControl,
+            "{{class_name}}_CV"+profileId,
+            cvName,
+            cvDpe);
+
+          bool cvSuccess = {{functionPrefix}}addressConfigWrapper(
+            cvDpe,
+            cvAddress,
+            DPATTR_ADDR_MODE_INPUT_SPONT /* mode */,
+            connectionSettings,
+            cvActive);
+
+          if (!cvSuccess)
+          {
+            DebugTN("Failed setting address for CalculatedVariable "+cvAddress);
+            if (!continueOnError)
+              return false;
+          }
+        }
+      }
+    } // end else (profileId != "")
+  }
+  {% endif %}
+
   dyn_int children;
   {% for ho in designInspector.objectify_has_objects(class_name, "[@instantiateUsing='configuration']") %}
     children = {{functionPrefix}}getChildNodesWithName(docNum, childNode, "{{ho.get('class')}}");
@@ -138,7 +316,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
   bool    assignAddresses,
   bool    continueOnError,
   mapping addressActiveControl,
-	mapping connectionSettings)
+  mapping connectionSettings)
 {
   DebugTN("ConfigureFromName.{{class_name}} called");
   string fullName = prefix+name;
@@ -185,7 +363,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
         	connectionSettings,
           active);
 
-        if (!success)
+        if (!success && !continueOnError)
         {
            DebugTN("Failed setting address "+address+"; will terminate now.");
            return false;
@@ -210,7 +388,7 @@ bool {{functionPrefix}}configureFromName{{class_name}} (
         	connectionSettings,
           active);
 
-        if (!success)
+        if (!success && !continueOnError)
         {
            DebugTN("Failed setting address "+address+"; will terminate now.");
            return false;
