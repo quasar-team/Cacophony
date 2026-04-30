@@ -3,6 +3,7 @@
 {#       May 2020, rework to Jinja2          #}
 
 // generated using Cacophony, an optional module of quasar, see: https://github.com/quasar-team/Cacophony
+#uses "fwConfigs/fwPeriphAddress.ctl"
 
 {% macro cache_variable_address_space_write_to_mode(aswrite) %}
   {% if aswrite == 'forbidden' %}DPATTR_ADDR_MODE_INPUT_SPONT /* mode */
